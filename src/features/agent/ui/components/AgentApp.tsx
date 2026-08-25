@@ -59,6 +59,8 @@ export function AgentApp({
   const [selectingElement, setSelectingElement] = useState(false);
   const [selectedElement, setSelectedElement] = useState<ObservedElement>();
   const [captureError, setCaptureError] = useState('');
+  const [celebrating, setCelebrating] = useState(false);
+  const wasActiveRef = useRef(session.agentActive);
 
   // 面板首次打开时：若没有任何 3h 内活跃的会话，则自动新建一个会话
   const freshSessionRef = useRef(false);
@@ -136,6 +138,23 @@ export function AgentApp({
       if (fabFrameRef.current) cancelAnimationFrame(fabFrameRef.current);
     };
   }, [open, session.agentActive]);
+
+  // 工作结束时：让右下角圆形按钮水平翻转庆祝一次
+  useEffect(() => {
+    const wasActive = wasActiveRef.current;
+    wasActiveRef.current = session.agentActive;
+    if (wasActive && !session.agentActive) {
+      setCelebrating(true);
+    } else if (session.agentActive) {
+      setCelebrating(false);
+    }
+  }, [session.agentActive]);
+
+  useEffect(() => {
+    if (!celebrating) return;
+    const timer = window.setTimeout(() => setCelebrating(false), 1300);
+    return () => window.clearTimeout(timer);
+  }, [celebrating]);
 
   useLayoutEffect(() => {
     if (teaching.session?.status === 'recording') onOpenChange(false);
@@ -278,7 +297,7 @@ export function AgentApp({
           ref={panelRef}
           className={`pagent-morph-shell pointer-events-auto absolute select-text ${
             open ? 'is-open' : ''
-          } ${manipulating ? 'is-manipulating' : ''}`}
+          } ${manipulating ? 'is-manipulating' : ''} ${celebrating ? 'is-celebrating' : ''}`}
           style={{
             left: open ? position.x : closedPosition.x,
             top: open ? position.y : closedPosition.y,
@@ -380,7 +399,7 @@ export function AgentApp({
             type="button"
             className={`pagent-fab ${
               session.agentActive ? 'is-working' : ''
-            } ${!session.agentActive ? 'is-idle' : ''}`}
+            } ${!session.agentActive ? 'is-idle' : ''} ${celebrating ? 'is-celebrating' : ''}`}
             onClick={() => onOpenChange(true)}
             tabIndex={open ? -1 : 0}
             aria-hidden={open}
@@ -394,8 +413,10 @@ export function AgentApp({
             ) : null}
             <span className="pagent-fab-face">
               <span className="pagent-fab-eyes" aria-hidden>
-                <span className="pagent-fab-eye" />
-                <span className="pagent-fab-eye" />
+                <span className="pagent-fab-eyes-orbit">
+                  <span className="pagent-fab-eye" />
+                  <span className="pagent-fab-eye" />
+                </span>
               </span>
             </span>
           </button>
