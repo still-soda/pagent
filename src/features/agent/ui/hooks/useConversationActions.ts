@@ -20,6 +20,8 @@ export function useConversationActions(options: {
   revisionRef: React.MutableRefObject<number>;
   sessionIdRef: React.MutableRefObject<string | undefined>;
   deletedConversationIdsRef: React.MutableRefObject<Set<string>>;
+  closedTabIdsRef: React.MutableRefObject<Set<string>>;
+  setClosedTabIds: React.Dispatch<React.SetStateAction<Set<string>>>;
   setConversations: React.Dispatch<React.SetStateAction<PageConversation[]>>;
   setActiveId: React.Dispatch<React.SetStateAction<string>>;
   setRevision: React.Dispatch<React.SetStateAction<number>>;
@@ -36,6 +38,8 @@ export function useConversationActions(options: {
     revisionRef,
     sessionIdRef,
     deletedConversationIdsRef,
+    closedTabIdsRef,
+    setClosedTabIds,
     setConversations,
     setActiveId,
     setWorkingOnThisPage,
@@ -148,6 +152,13 @@ export function useConversationActions(options: {
       bumpRevision();
       setActiveId(id);
       setView('chat');
+      // 从历史中打开一个已关闭的标签页 → 重新打开
+      if (closedTabIdsRef.current.has(id)) {
+        const next = new Set(closedTabIdsRef.current);
+        next.delete(id);
+        closedTabIdsRef.current = next;
+        setClosedTabIds(next);
+      }
       // 从历史中打开的旧会话也视为"打开"的标签页：触碰 updatedAt 使其进入最近窗口
       setConversations((current) =>
         current.some((item) => item.id === id && isRecentConversation(item))
@@ -157,13 +168,53 @@ export function useConversationActions(options: {
             ),
       );
     },
-    [bumpRevision, setActiveId, setConversations, setView],
+    [bumpRevision, closedTabIdsRef, setActiveId, setClosedTabIds, setConversations, setView],
   );
 
-  const closeConversation = useCallback(
+  /** 关闭标签页：仅从标签栏隐藏会话，不删除历史；关闭当前标签时切换到其他打开的标签页 */
+  const closeTab = useCallback(
+    (id: string) => {
+      const openTabs = () =>
+        conversationsRef.current.filter(
+          (item) => item.id !== id && isRecentConversation(item) && !closedTabIdsRef.current.has(item.id),
+        );
+      if (id === activeIdRef.current) {
+        const remaining = openTabs();
+        if (remaining.length > 0) {
+          const nextId = remaining.at(-1)!.id;
+          bumpRevision();
+          activeIdRef.current = nextId;
+          setActiveId(nextId);
+          setView('chat');
+        } else {
+          // 没有其他打开的标签页：保留至少一个会话标签，像浏览器一样新建一个
+          void createConversation();
+        }
+      }
+      const next = new Set(closedTabIdsRef.current);
+      next.add(id);
+      closedTabIdsRef.current = next;
+      setClosedTabIds(next);
+    },
+    [
+      activeIdRef,
+      bumpRevision,
+      closedTabIdsRef,
+      conversationsRef,
+      createConversation,
+      setActiveId,
+      setClosedTabIds,
+      setView,
+    ],
+  );
+
+  /** 删除会话：从存储与历史中彻底移除 */
+  const deleteConversation = useCallback(
     (id: string) => {
       bumpRevision();
       deletedConversationIdsRef.current.add(id);
+      closedTabIdsRef.current.delete(id);
+      setClosedTabIds(new Set(closedTabIdsRef.current));
       setConversations((current) => {
         if (current.length <= 1) {
           const domain = conversationVaultKey(pageUrlRef.current);
@@ -180,8 +231,16 @@ export function useConversationActions(options: {
         return next;
       });
     },
-    [activeIdRef, bumpRevision, deletedConversationIdsRef, pageUrlRef, setActiveId, setConversations, setView],
+    [activeIdRef, bumpRevision, closedTabIdsRef, deletedConversationIdsRef, pageUrlRef, setActiveId, setClosedTabIds, setConversations, setView],
   );
 
-  return { send, stop, clear, createConversation, selectConversation, closeConversation };
+  return {
+    send,
+    stop,
+    clear,
+    createConversation,
+    selectConversation,
+    closeTab,
+    deleteConversation,
+  };
 }

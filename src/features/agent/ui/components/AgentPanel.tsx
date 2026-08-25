@@ -28,10 +28,12 @@ export function AgentPanel({
   page,
   view,
   conversations,
+  closedTabIds,
   activeConversationId,
   onSelectConversation,
   onCreateConversation,
-  onCloseConversation,
+  onCloseTab,
+  onDeleteConversation,
   onViewChange,
   onClose,
   onSubmit,
@@ -63,10 +65,12 @@ export function AgentPanel({
   error: string;
   page: { url: string; title: string; selection: string };
   conversations: Array<{ id: string; title: string; updatedAt?: number; running?: boolean }>;
+  closedTabIds: ReadonlySet<string>;
   activeConversationId: string;
   onSelectConversation: (id: string) => void;
   onCreateConversation: () => void | Promise<void>;
-  onCloseConversation: (id: string) => void;
+  onCloseTab: (id: string) => void;
+  onDeleteConversation: (id: string) => void;
   view: 'chat' | 'settings';
   onViewChange: (view: 'chat' | 'settings') => void;
   onClose: () => void;
@@ -99,15 +103,17 @@ export function AgentPanel({
   const activeTitle =
     conversations.find((item) => item.id === activeConversationId)?.title ?? '会话';
 
-  // 标签页只展示最近 3h 内活跃的会话 + 当前会话；其余保留在历史抽屉中
+  // 标签页只展示最近 3h 内活跃（且未被关闭）的会话 + 当前会话；其余保留在历史抽屉中
   const tabs = conversations.filter(
-    (item) => isRecentConversation(item) || item.id === activeConversationId,
+    (item) =>
+      (isRecentConversation(item) && !closedTabIds.has(item.id)) ||
+      item.id === activeConversationId,
   );
 
-  const handleCloseTab = (id: string) => {
+  const handleDeleteConversation = (id: string) => {
     const target = conversations.find((item) => item.id === id);
     if (target?.running) onStop();
-    onCloseConversation(id);
+    onDeleteConversation(id);
   };
 
   return (
@@ -128,7 +134,7 @@ export function AgentPanel({
         conversations={tabs}
         activeId={activeConversationId}
         onSelect={onSelectConversation}
-        onClose={handleCloseTab}
+        onClose={onCloseTab}
         onCreate={() => {
           setHistoryOpen(false);
           return onCreateConversation();
@@ -145,7 +151,7 @@ export function AgentPanel({
           onSelectConversation(id);
           setHistoryOpen(false);
         }}
-        onDelete={onCloseConversation}
+        onDelete={handleDeleteConversation}
         onClose={() => setHistoryOpen(false)}
       />
 

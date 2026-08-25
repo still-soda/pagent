@@ -337,10 +337,12 @@ export function AgentApp({
               error={session.error}
               page={session.page}
               conversations={session.conversations}
+              closedTabIds={session.closedTabIds}
               activeConversationId={session.activeId}
               onSelectConversation={session.selectConversation}
               onCreateConversation={session.createConversation}
-              onCloseConversation={session.closeConversation}
+              onCloseTab={session.closeTab}
+              onDeleteConversation={session.deleteConversation}
               view={session.view}
               onViewChange={session.setView}
               onClose={() => onOpenChange(false)}

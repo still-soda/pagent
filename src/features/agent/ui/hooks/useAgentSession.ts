@@ -24,6 +24,8 @@ export function useAgentSession() {
   const revisionRef = useRef(0);
   const sessionIdRef = useRef<string | undefined>(undefined);
   const deletedConversationIdsRef = useRef(new Set<string>());
+  const closedTabIdsRef = useRef(new Set<string>());
+  const [closedTabIds, setClosedTabIds] = useState<Set<string>>(() => new Set());
   pageUrlRef.current = page.url;
 
   const sync = useBackgroundSessionSync(vaultKey, page.url, {
@@ -108,6 +110,8 @@ export function useAgentSession() {
     revisionRef,
     sessionIdRef,
     deletedConversationIdsRef,
+    closedTabIdsRef,
+    setClosedTabIds,
     setConversations: sync.setConversations,
     setActiveId: sync.setActiveId,
     setRevision: sync.setRevision,
@@ -143,6 +147,7 @@ export function useAgentSession() {
     settings,
     setSettings,
     conversations: sync.conversations,
+    closedTabIds,
     activeId: active?.id ?? sync.activeId,
     messages: active?.messages ?? [],
     tasks: active?.tasks ?? [],
@@ -156,7 +161,8 @@ export function useAgentSession() {
     clear: actions.clear,
     createConversation: actions.createConversation,
     selectConversation: actions.selectConversation,
-    closeConversation: actions.closeConversation,
+    closeTab: actions.closeTab,
+    deleteConversation: actions.deleteConversation,
     themeClass,
     ready: Boolean(sync.readyKey),
     restorePanel: sync.restorePanel,
