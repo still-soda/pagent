@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isTransientRuntimeError, shouldRetryRpc } from '../../lib/keepalive';
+import { isTransientRuntimeError, shouldRetryRpc } from '@/shared/extension/keepalive';
 
 describe('service worker keepalive', () => {
   it('retries only when the background worker was asleep', () => {

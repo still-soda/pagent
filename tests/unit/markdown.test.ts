@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderMarkdown } from '../../lib/markdown';
+import { renderMarkdown } from '@/shared/utils/markdown';
 
 describe('renderMarkdown', () => {
   it('renders common agent formatting', () => {

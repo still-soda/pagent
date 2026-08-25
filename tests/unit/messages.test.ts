@@ -10,8 +10,8 @@ import {
   settleAssistantMessages,
   shouldHoldToolGroupOpen,
   toModelMessages,
-} from '../../lib/messages';
-import type { ChatMessage } from '../../lib/shared/types';
+} from '@/features/agent/session/messages';
+import type { ChatMessage } from '@/shared/contracts/session-messages';
 
 describe('assistant message parts', () => {
   it('keeps a longer streamed reply when a shorter snapshot arrives', () => {

@@ -9,7 +9,7 @@ import {
   listNetwork,
   redactHeaders,
   summarizeNetwork,
-} from '../../lib/browser/devtools-log';
+} from '@/shared/browser/devtools-log';
 
 describe('devtools-log', () => {
   it('tracks a request through response and finish', () => {

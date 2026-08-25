@@ -4,8 +4,8 @@ import {
   createStreamToolState,
   extractText,
   interpretStreamChunk,
-} from '../../lib/agent/stream';
-import { toUserErrorMessage } from '../../lib/shared/errors';
+} from '@/features/agent/runtime/stream';
+import { toUserErrorMessage } from '@/shared/contracts/errors';
 
 describe('agent stream parsing', () => {
   it('reads token deltas from LangGraph messages tuples', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SYSTEM_PROMPT, buildSystemPrompt } from '../../lib/agent/prompts';
+import { SYSTEM_PROMPT, buildSystemPrompt } from '@/features/agent/runtime/prompts';
 
 describe('system prompt', () => {
   it('appends mentioned-tab context without changing the base prompt', () => {

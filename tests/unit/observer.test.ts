@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { implicitRole, PageObserver, visibleText } from '../../entrypoints/content/observer';
+import { implicitRole, PageObserver, visibleText } from '@/features/page/observer';
 
 describe('PageObserver', () => {
   it('assigns stable ids and revisions', () => {

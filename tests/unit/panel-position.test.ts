@@ -5,7 +5,7 @@ import {
   defaultPanelPosition,
   isPanelDragTarget,
   nextPanelResize,
-} from '../../lib/panel-position';
+} from '@/shared/extension/panel-position';
 
 describe('panel position', () => {
   it('keeps the panel inside the viewport', () => {

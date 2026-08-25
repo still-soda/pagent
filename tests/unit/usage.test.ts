@@ -7,7 +7,7 @@ import {
   mergeTurnUsage,
   preferRicherUsage,
   withTurnTiming,
-} from '../../lib/agent/usage';
+} from '@/features/agent/runtime/usage';
 
 describe('turn usage', () => {
   it('reads LangChain usage_metadata including cache hits', () => {

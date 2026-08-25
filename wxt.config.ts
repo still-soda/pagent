@@ -1,12 +1,22 @@
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'wxt';
+import { resolve } from 'node:path';
 
 export default defineConfig({
+  srcDir: 'src',
   outDir: 'dist',
   outDirTemplate: '.',
   modules: ['@wxt-dev/module-react'],
+  alias: {
+    '@': resolve('src'),
+  },
   vite: () => ({
     plugins: [tailwindcss()],
+    resolve: {
+      alias: {
+        '@': resolve('src'),
+      },
+    },
   }),
   manifest: {
     name: 'Pagent',

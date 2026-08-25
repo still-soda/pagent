@@ -9,6 +9,28 @@
 - UI 直接使用 [Beautiful UI](https://www.beautifului.dev/) 的 Chat、Prompt Bar、Thinking、Streaming Text、Tool Chips、Task Rows、Context Cards 等 MIT 示例组件
 - LangChain.js `createAgent` + Zod 工具
 
+## 目录结构
+
+```
+src/
+  entrypoints/          # WXT 入口（background、content、options、popup）
+  features/
+    agent/              # Agent 后台、runtime、会话领域、UI
+    page/               # 页面观测/操作与 content 命令
+    settings/           # 设置面板
+  shared/
+    browser/            # tabs、CDP、截图、权限
+    contracts/          # RPC schema 与领域类型（settings/page/session/agent）
+    extension/          # rpc、keepalive、theme、hotkey 等扩展基础设施
+    storage/            # chrome.storage 与 IndexedDB
+    ui/                 # 通用 UI 与 Beautiful UI 原语
+    utils/
+  assets/               # 样式与静态资源
+public/                 # WXT public（图标等，保持根目录）
+tests/unit              # 单元测试
+tests/e2e               # Playwright E2E（fixtures 在 tests/e2e/fixtures）
+```
+
 ## 开发
 
 ```bash

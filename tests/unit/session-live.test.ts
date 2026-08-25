@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { emptyConversation } from '../../lib/conversations';
+import { emptyConversation } from '@/features/agent/session/conversations';
 import {
   adoptLiveStore,
   applyAgentEventToStore,
   sessionIsOnTab,
   shouldRestoreLiveSession,
-} from '../../lib/session-live';
-import type { PageConversationStore } from '../../lib/shared/types';
+} from '@/features/agent/session/session-live';
+import type { PageConversationStore } from '@/shared/contracts/session';
 
 describe('live session presence', () => {
   it('is only on the current tab while the agent is running there', () => {

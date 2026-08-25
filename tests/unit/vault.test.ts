@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emptyConversation } from '../../lib/conversations';
+import { emptyConversation } from '@/features/agent/session/conversations';
 import {
   applyVaultStoreUpdate,
   archiveActiveConversations,
@@ -8,8 +8,8 @@ import {
   filterStoreForVault,
   removeConversationFromVaults,
   viewForVault,
-} from '../../lib/vault';
-import type { PageConversationStore, VaultMap } from '../../lib/shared/types';
+} from '@/features/agent/session/vault';
+import type { PageConversationStore, VaultMap } from '@/shared/contracts/session';
 
 function storeOf(...items: ReturnType<typeof emptyConversation>[]): PageConversationStore {
   return { activeId: items[0]!.id, conversations: items };

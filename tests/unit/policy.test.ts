@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { assertNavigableUrl, isRepeatedAction, redactText } from '../../lib/shared/policy';
-import { DEFAULT_SETTINGS } from '../../lib/shared/types';
+import { assertNavigableUrl, isRepeatedAction, redactText } from '@/shared/contracts/policy';
+import { DEFAULT_SETTINGS } from '@/shared/contracts/settings';
 
 describe('redactText', () => {
   it('redacts emails and keys', () => {

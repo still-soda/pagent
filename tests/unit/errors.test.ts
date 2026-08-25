@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isProtectedUrl, toErrorMessage, toUserErrorMessage } from '../../lib/shared/errors';
+import { isProtectedUrl, toErrorMessage, toUserErrorMessage } from '@/shared/contracts/errors';
 
 describe('errors', () => {
   it('marks browser internal pages as protected', () => {

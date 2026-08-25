@@ -3,14 +3,15 @@
   "compilerOptions": {
     "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
-    "types": ["node"]
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
   },
   "include": [
     ".wxt/**/*",
-    "entrypoints/**/*",
-    "components/**/*",
-    "hooks/**/*",
-    "lib/**/*",
+    "src/**/*",
     "tests/**/*",
     "vitest.config.ts",
     "playwright.config.ts",

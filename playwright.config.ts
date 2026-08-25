@@ -5,7 +5,7 @@ export default defineConfig({
   fullyParallel: false,
   retries: 0,
   webServer: {
-    command: 'python3 -m http.server 4177 --directory tests/fixtures',
+    command: 'python3 -m http.server 4177 --directory tests/e2e/fixtures',
     port: 4177,
     reuseExistingServer: true,
   },

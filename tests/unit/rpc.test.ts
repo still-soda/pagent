@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isRpcRequest, parseRpcPayload } from '../../lib/shared/rpc';
+import { isRpcRequest, parseRpcPayload } from '@/shared/contracts/rpc';
 
 describe('rpc schemas', () => {
   it('parses search payload', () => {

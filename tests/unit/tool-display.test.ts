@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toolChip, toolDetailLines, toolKind, toolLabel, toolUsesMono } from '../../lib/tool-display';
+import { toolChip, toolDetailLines, toolKind, toolLabel, toolUsesMono } from '@/features/agent/session/tool-display';
 
 describe('tool display', () => {
   it('gives each built-in tool a Chinese label', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isTogglePanelHotkey } from '../../lib/hotkey';
+import { isTogglePanelHotkey } from '@/shared/extension/hotkey';
 
 describe('isTogglePanelHotkey', () => {
   it('matches Alt+P', () => {

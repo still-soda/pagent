@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isScrolledToBottom, nextStickPinned } from '../../hooks/useStickToBottom';
+import { isScrolledToBottom, nextStickPinned } from '@/features/agent/ui/hooks/useStickToBottom';
 
 describe('isScrolledToBottom', () => {
   it('treats a near-bottom scroller as pinned', () => {

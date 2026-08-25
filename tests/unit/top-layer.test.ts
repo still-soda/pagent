@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach } from 'vitest';
-import { applyTopLayerHostStyles, placeHostLast, promoteHostToTopLayer } from '../../lib/top-layer';
+import { applyTopLayerHostStyles, placeHostLast, promoteHostToTopLayer } from '@/shared/extension/top-layer';
 
 describe('top-layer', () => {
   afterEach(() => {

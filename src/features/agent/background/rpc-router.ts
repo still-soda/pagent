@@ -1,0 +1,254 @@
+import { parseRpcPayload, type RpcName } from '@/shared/contracts/rpc';
+import { assertNavigableUrl } from '@/shared/contracts/policy';
+import {
+  clearSecrets,
+  loadSettings,
+  loadSecrets,
+  saveSecret,
+  saveSettings,
+  secretPresence,
+  loadTabUi,
+  saveTabUi,
+  saveVaultFromStore,
+} from '@/shared/storage/storage';
+import { getPermissionState, requestPermissions } from '@/shared/browser/permissions';
+import {
+  closeTab,
+  createTab,
+  getActiveTab,
+  goBack,
+  goForward,
+  listTabs,
+  navigateTab,
+  reloadTab,
+  switchTab,
+} from '@/shared/browser/tabs';
+import { captureVisibleTab, trimDataUrl } from '@/shared/browser/screenshot';
+import {
+  attachDebugger,
+  captureCdpScreenshot,
+  detachDebugger,
+  dispatchClick,
+  dispatchMove,
+  evaluateExpression,
+  getConsoleLog,
+  getNetworkLog,
+  getNetworkRequest,
+  insertText,
+} from '@/shared/browser/cdp';
+import { testModelConnection } from '@/features/agent/runtime/models';
+import { isSparseStore } from '@/features/agent/session/conversations';
+import { conversationVaultKey } from '@/features/agent/session/vault';
+import type { AgentSettings } from '@/shared/contracts/settings';
+import type { PageConversationStore } from '@/shared/contracts/session';
+import {
+  findRunningByTab,
+  retargetAgent,
+  running,
+  startAgent,
+  stopAgent,
+} from './agent-controller';
+import { sendToContent, snapshotMentionedTab, togglePanel } from './content-bridge';
+import { archiveTabNavigation, readTabStore, resolveTabUrl, tabDomains, tabStores, writeTabStore } from './tab-store';
+
+export async function handleRpc(name: RpcName, payload: unknown, senderTabId?: number) {
+  const tabId = senderTabId ?? (await getActiveTab()).id!;
+  const settings = await loadSettings();
+
+  switch (name) {
+    case 'dom.observe':
+    case 'dom.search':
+    case 'dom.click':
+    case 'dom.dblclick':
+    case 'dom.hover':
+    case 'dom.focus':
+    case 'dom.highlight':
+    case 'dom.type':
+    case 'dom.clear':
+    case 'dom.select':
+    case 'dom.press':
+    case 'dom.drag':
+    case 'dom.scroll':
+    case 'dom.wait':
+    case 'dom.script':
+    case 'page.info':
+    case 'page.source':
+      return sendToContent(tabId, name, parseRpcPayload(name, payload));
+    case 'page.navigate': {
+      const data = parseRpcPayload('page.navigate', payload);
+      assertNavigableUrl(data.url, settings);
+      return navigateTab(tabId, data.url);
+    }
+    case 'page.back':
+      return goBack(tabId);
+    case 'page.forward':
+      return goForward(tabId);
+    case 'page.reload':
+      return reloadTab(tabId);
+    case 'tabs.query':
+      return listTabs();
+    case 'tabs.snapshot': {
+      const data = parseRpcPayload('tabs.snapshot', payload);
+      return Promise.all(data.tabIds.map(snapshotMentionedTab));
+    }
+    case 'tabs.create': {
+      const data = parseRpcPayload('tabs.create', payload);
+      if (data.url) assertNavigableUrl(data.url, settings);
+      return createTab(data.url);
+    }
+    case 'tabs.switch': {
+      const data = parseRpcPayload('tabs.switch', payload);
+      const target = data.tabId ?? tabId;
+      const result = await switchTab(target);
+      await retargetAgent(tabId, target);
+      return result;
+    }
+    case 'tabs.close': {
+      const data = parseRpcPayload('tabs.close', payload);
+      return closeTab(data.tabId ?? tabId);
+    }
+    case 'screenshot.capture': {
+      const data = parseRpcPayload('screenshot.capture', payload);
+      if (data.fullPage) return trimDataUrl(await captureCdpScreenshot(tabId, true));
+      return trimDataUrl(await captureVisibleTab((await browser.tabs.get(tabId)).windowId));
+    }
+    case 'permissions.get':
+      return getPermissionState();
+    case 'permissions.request':
+      return requestPermissions(parseRpcPayload('permissions.request', payload));
+    case 'cdp.attach':
+      await attachDebugger(tabId);
+      return { ok: true };
+    case 'cdp.detach':
+      await detachDebugger(tabId);
+      return { ok: true };
+    case 'cdp.script': {
+      const data = parseRpcPayload('cdp.script', payload);
+      return evaluateExpression(tabId, data.expression, data.awaitPromise);
+    }
+    case 'cdp.input': {
+      const data = parseRpcPayload('cdp.input', payload);
+      await attachDebugger(tabId);
+      if (data.type === 'move') await dispatchMove(tabId, data.x, data.y);
+      else await dispatchClick(tabId, data.x, data.y);
+      if (data.text) await insertText(tabId, data.text);
+      return { ok: true };
+    }
+    case 'cdp.screenshot': {
+      const data = parseRpcPayload('cdp.screenshot', payload);
+      return trimDataUrl(await captureCdpScreenshot(tabId, Boolean(data.fullPage)));
+    }
+    case 'cdp.network':
+      if (!settings.captureDevtools) return { error: '用户已关闭网络/控制台采集。' };
+      return getNetworkLog(tabId, parseRpcPayload('cdp.network', payload));
+    case 'cdp.console':
+      if (!settings.captureDevtools) return { error: '用户已关闭网络/控制台采集。' };
+      return getConsoleLog(tabId, parseRpcPayload('cdp.console', payload));
+    case 'cdp.networkRequest': {
+      if (!settings.captureDevtools) return { error: '用户已关闭网络/控制台采集。' };
+      const data = parseRpcPayload('cdp.networkRequest', payload);
+      return getNetworkRequest(tabId, data.requestId, data.includeBody);
+    }
+    case 'settings.get':
+      return settings;
+    case 'settings.set':
+      return saveSettings(parseRpcPayload('settings.set', payload) as Partial<AgentSettings>);
+    case 'secrets.set': {
+      const data = parseRpcPayload('secrets.set', payload);
+      await saveSecret(data.provider, data.apiKey);
+      return { ok: true };
+    }
+    case 'secrets.clear':
+      await clearSecrets(parseRpcPayload('secrets.clear', payload).provider);
+      return { ok: true };
+    case 'secrets.has':
+      return secretPresence();
+    case 'llm.test': {
+      const data = parseRpcPayload('llm.test', payload);
+      const next = await saveSettings({
+        model: {
+          ...settings.model,
+          provider: data.provider,
+          model: data.model,
+          baseURL: data.baseURL,
+          apiProtocol: data.apiProtocol ?? settings.model.apiProtocol,
+        },
+      });
+      return testModelConnection(next, await loadSecrets());
+    }
+    case 'agent.start': {
+      const data = parseRpcPayload('agent.start', payload);
+      return startAgent(data.tabId ?? tabId, data.prompt, data.conversationId, data.history, data.context);
+    }
+    case 'session.context': {
+      const data = parseRpcPayload('session.context', payload);
+      const control = findRunningByTab(tabId);
+      const url = await resolveTabUrl(tabId, data.url);
+      if (url) await archiveTabNavigation(tabId, url);
+      const stored = await readTabStore(tabId, url);
+      const store = control?.store ?? stored;
+      const tabUi = await loadTabUi(tabId);
+      const tabOpen = store?.panelOpen ?? tabUi?.panelOpen ?? tabStores.get(tabId)?.panelOpen ?? false;
+      return {
+        tabId,
+        sessionTabId: control?.tabId ?? tabId,
+        sessionId: control?.sessionId ?? store?.sessionId,
+        revision: store?.revision ?? 0,
+        running: Boolean(control),
+        agentActive: running.size > 0,
+        conversationId: control?.conversationId ?? store?.activeId,
+        panelOpen: Boolean(control) || Boolean(tabOpen),
+        store,
+      };
+    }
+    case 'session.setUi': {
+      const data = parseRpcPayload('session.setUi', payload);
+      const url = await resolveTabUrl(tabId);
+      await saveTabUi(tabId, { panelOpen: data.panelOpen });
+      const store = await readTabStore(tabId, url);
+      if (!store) return { ok: true };
+      await writeTabStore(tabId, { ...store, panelOpen: data.panelOpen }, url, { deleteMissing: false });
+      return { ok: true };
+    }
+    case 'session.saveStore': {
+      const data = parseRpcPayload('session.saveStore', payload);
+      const senderUrl = data.url;
+      const currentUrl = await resolveTabUrl(tabId);
+      const senderDomain = senderUrl ? conversationVaultKey(senderUrl) : null;
+      const currentDomain = currentUrl ? conversationVaultKey(currentUrl) : tabDomains.get(tabId);
+      const deleted = new Set(data.deletedConversationIds ?? []);
+      const incoming: PageConversationStore = {
+        activeId: data.activeId,
+        conversations: data.conversations.filter((item) => !deleted.has(item.id)),
+        panelOpen: data.panelOpen,
+        sessionId: data.sessionId,
+        revision: data.revision,
+      };
+      const control = findRunningByTab(tabId);
+      if (
+        control &&
+        (incoming.revision ?? 0) > (control.store.revision ?? 0) &&
+        incoming.conversations.some((item) => item.id === control.conversationId)
+      ) {
+        control.store = incoming;
+      }
+      if (senderDomain && !isSparseStore(incoming)) {
+        await saveVaultFromStore(senderDomain, incoming, {
+          deleteMissing: !currentDomain || currentDomain === senderDomain,
+        });
+      }
+      if (!currentDomain || !senderDomain || currentDomain === senderDomain) {
+        await writeTabStore(tabId, incoming, senderUrl ?? currentUrl);
+      }
+      return { ok: true };
+    }
+    case 'agent.stop':
+      stopAgent(parseRpcPayload('agent.stop', payload).tabId ?? tabId);
+      return { ok: true };
+    case 'agent.toggle':
+      return togglePanel(tabId);
+    default:
+      throw new Error(`未知命令 ${name}`);
+  }
+}
+

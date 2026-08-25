@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isUnrecoverableToolError, toolFailureContent } from '../../lib/agent/middleware';
+import { isUnrecoverableToolError, toolFailureContent } from '@/features/agent/runtime/middleware';
 
 describe('tool error recovery', () => {
   it('turns ordinary tool failures into a message the model can continue from', () => {

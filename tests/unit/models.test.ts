@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { createChatModel, resolveApiProtocol, resolveModelBaseURL } from '../../lib/agent/models';
+import { createChatModel, resolveApiProtocol, resolveModelBaseURL } from '@/features/agent/runtime/models';
 import {
   DEFAULT_SETTINGS,
   modelsForProvider,
   providerSupportsResponsesApi,
   resolveCatalogModel,
   type AgentSettings,
-} from '../../lib/shared/types';
-import { parseRpcPayload } from '../../lib/shared/rpc';
+} from '@/shared/contracts/settings';
+import { parseRpcPayload } from '@/shared/contracts/rpc';
 
 function settings(patch: Partial<AgentSettings['model']>): AgentSettings {
   return {

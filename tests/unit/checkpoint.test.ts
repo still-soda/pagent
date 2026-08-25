@@ -4,8 +4,8 @@ import {
   clearCheckpoint,
   loadCheckpoints,
   saveCheckpoint,
-} from '../../lib/agent/checkpoint';
-import { resetSessionStorageForTests } from '../../lib/storage';
+} from '@/features/agent/session/checkpoint';
+import { resetSessionStorageForTests } from '@/shared/storage/storage';
 
 describe('agent checkpoints', () => {
   beforeEach(async () => {

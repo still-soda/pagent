@@ -12,7 +12,7 @@ import {
   SLASH_COMMANDS,
   tabHost,
   visiblePrompt,
-} from '../../lib/composer';
+} from '@/features/agent/session/composer';
 
 describe('composer tokens', () => {
   it('parses @ and / at the start or after whitespace, including Chinese queries', () => {

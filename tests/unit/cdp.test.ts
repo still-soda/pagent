@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveDebuggerApi } from '../../lib/browser/cdp';
+import { resolveDebuggerApi } from '@/shared/browser/cdp';
 
 describe('resolveDebuggerApi', () => {
   it('reads chrome.debugger at call time', () => {

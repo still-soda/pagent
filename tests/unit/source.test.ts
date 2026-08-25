@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PageObserver, pageObserver } from '../../entrypoints/content/observer';
-import { compileMatcher, getPageSource, serializeLiveDom } from '../../entrypoints/content/source';
+import { PageObserver, pageObserver } from '@/features/page/observer';
+import { compileMatcher, getPageSource, serializeLiveDom } from '@/features/page/source';
 
 describe('getPageSource', () => {
   beforeEach(() => {

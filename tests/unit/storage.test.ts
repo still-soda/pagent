@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { emptyConversation } from '../../lib/conversations';
+import { emptyConversation } from '@/features/agent/session/conversations';
 import {
   chromeSessionItemsForTests,
   clearTabUi,
@@ -12,8 +12,8 @@ import {
   savePageConversations,
   saveTabUi,
   saveVaultFromStore,
-} from '../../lib/storage';
-import type { PageConversationStore } from '../../lib/shared/types';
+} from '@/shared/storage/storage';
+import type { PageConversationStore } from '@/shared/contracts/session';
 
 function storeOf(title: string, domain = 'example.com'): PageConversationStore {
   const item = emptyConversation(title, [domain]);

@@ -1,0 +1,146 @@
+import { useState } from 'react';
+import type { PointerEvent } from 'react';
+import LoadingState from '@/shared/ui/beautiful-ui/primitives/LoadingState';
+import { SettingsPanel } from '@/features/settings/SettingsPanel';
+import { useStickToBottom } from '../hooks/useStickToBottom';
+import type { ChatMessage, TaskRow } from '@/shared/contracts/session-messages';
+import type { AgentSettings } from '@/shared/contracts/settings';
+import { PanelHeader } from './PanelHeader';
+import { HistoryDrawer } from './HistoryDrawer';
+import { PageContext } from './PageContext';
+import { AssistantMessage, hasAssistantOutput } from './AssistantMessage';
+import { Composer } from './Composer';
+
+export function AgentPanel({
+  settings,
+  messages,
+  tasks: _tasks,
+  running,
+  workingOnThisPage = running,
+  thinking,
+  error,
+  page,
+  view,
+  conversations,
+  activeConversationId,
+  onSelectConversation,
+  onCreateConversation,
+  onCloseConversation,
+  onViewChange,
+  onClose,
+  onSubmit,
+  onStop,
+  onClear,
+  onClearSelection,
+  onSettingsChange,
+  onHeaderPointerDown,
+}: {
+  settings: AgentSettings;
+  messages: ChatMessage[];
+  tasks: TaskRow[];
+  running: boolean;
+  workingOnThisPage?: boolean;
+  thinking: string;
+  error: string;
+  page: { url: string; title: string; selection: string };
+  conversations: Array<{ id: string; title: string; updatedAt?: number }>;
+  activeConversationId: string;
+  onSelectConversation: (id: string) => void;
+  onCreateConversation: () => void | Promise<void>;
+  onCloseConversation: (id: string) => void;
+  view: 'chat' | 'settings';
+  onViewChange: (view: 'chat' | 'settings') => void;
+  onClose: () => void;
+  onSubmit: (prompt: string, context?: string) => void;
+  onStop: () => void;
+  onClear: () => void;
+  onClearSelection: () => void;
+  onSettingsChange: (settings: AgentSettings) => void;
+  onHeaderPointerDown?: (event: PointerEvent<HTMLDivElement>) => void;
+}) {
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const lastUserId = [...messages].reverse().find((message) => message.role === 'user')?.id;
+  const { scrollerRef, contentRef, onScroll } = useStickToBottom({
+    enabled: view === 'chat' && !historyOpen,
+    resetKey: `${activeConversationId}:${lastUserId ?? ''}`,
+  });
+  const activeTitle =
+    conversations.find((item) => item.id === activeConversationId)?.title ?? '会话';
+
+  return (
+    <div className="pagent-window relative flex h-[min(680px,calc(100vh-48px))] w-full flex-col self-start">
+      <PanelHeader
+        activeTitle={activeTitle}
+        historyOpen={historyOpen}
+        workingOnThisPage={workingOnThisPage}
+        running={running}
+        view={view}
+        onHistoryToggle={() => setHistoryOpen((open) => !open)}
+        onCreateConversation={() => {
+          setHistoryOpen(false);
+          return onCreateConversation();
+        }}
+        onClear={onClear}
+        onViewChange={onViewChange}
+        onStop={onStop}
+        onClose={onClose}
+        onHeaderPointerDown={onHeaderPointerDown}
+      />
+
+      <HistoryDrawer
+        open={historyOpen}
+        conversations={conversations}
+        activeId={activeConversationId}
+        onSelect={(id) => {
+          onSelectConversation(id);
+          setHistoryOpen(false);
+        }}
+        onDelete={onCloseConversation}
+        onClose={() => setHistoryOpen(false)}
+      />
+
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <div
+          ref={scrollerRef}
+          onScroll={onScroll}
+          className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] px-3 pt-2.5 pb-2"
+        >
+          {view === 'settings' ? (
+            <SettingsPanel settings={settings} onChange={onSettingsChange} />
+          ) : (
+            <div ref={contentRef} className="flex flex-col gap-2.5">
+              <PageContext page={page} onClearSelection={onClearSelection} />
+              {messages.map((message) =>
+                message.role === 'user' ? (
+                  <div key={message.id} className="flex justify-end pl-14">
+                    <div className="rounded-xl bg-field px-3 py-1.5 text-[13px] leading-[1.4] text-ink">
+                      {message.content}
+                    </div>
+                  </div>
+                ) : (
+                  <AssistantMessage
+                    key={message.id}
+                    message={message}
+                    streaming={running && message === messages.at(-1)}
+                  />
+                ),
+              )}
+              {running && !hasAssistantOutput(messages.at(-1)) && (
+                <LoadingState label={thinking || '正在思考…'} variant="Dots" />
+              )}
+              {error && (
+                <div className="rounded-card bg-red-tint px-3 py-2 text-[12.5px] text-red">
+                  {error}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {view === 'chat' && (
+          <Composer settings={settings} onSubmit={onSubmit} onSettingsChange={onSettingsChange} />
+        )}
+      </div>
+    </div>
+  );
+}

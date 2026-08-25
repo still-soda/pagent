@@ -13,7 +13,7 @@ import {
   restoreConversationStore,
   settleFinishedConversation,
   titleFromPrompt,
-} from '../../lib/conversations';
+} from '@/features/agent/session/conversations';
 
 describe('page conversations', () => {
   it('can still derive a legacy origin+path key', () => {

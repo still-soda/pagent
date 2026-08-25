@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   installPageNavigationEvents,
   PAGE_NAVIGATION_EVENT,
-} from '../../lib/page-navigation';
+} from '@/features/page/navigation';
 
 describe('page navigation events', () => {
   it('notifies after pushState and replaceState commit the new URL', async () => {

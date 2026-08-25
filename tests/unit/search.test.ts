@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { PageObserver, pageObserver } from '../../entrypoints/content/observer';
-import { searchPageText } from '../../entrypoints/content/search';
+import { PageObserver, pageObserver } from '@/features/page/observer';
+import { searchPageText } from '@/features/page/search';
 
 describe('searchPageText', () => {
   beforeEach(() => {

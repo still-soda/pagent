@@ -4,7 +4,7 @@ import {
   restoreRememberedSelection,
   retainPageSelectionOnPointerDown,
   shouldPreservePagentFocus,
-} from '../../entrypoints/content/selection';
+} from '@/features/page/selection';
 
 describe('page selection retain', () => {
   it('treats form fields as editable', () => {
