@@ -20,6 +20,7 @@ import {
   type AgentSettings,
   type SecretMap,
 } from '@/shared/contracts/settings';
+import { EMPTY_MCP_CONFIG, mcpConfigSchema, type McpConfig } from '@/shared/contracts/mcp';
 import type {
   Checkpoint,
   DomainVault,
@@ -30,6 +31,10 @@ import { applyVaultStoreUpdate, conversationVaultKey, viewForVault } from '@/fea
 
 export const settingsItem = storage.defineItem<AgentSettings>('local:pagent-settings', {
   fallback: DEFAULT_SETTINGS,
+});
+
+export const mcpConfigItem = storage.defineItem<McpConfig>('local:pagent-mcp-config', {
+  fallback: EMPTY_MCP_CONFIG,
 });
 
 export const checkpointItem = storage.defineItem<Checkpoint | null>('local:pagent-checkpoint', {
@@ -271,6 +276,18 @@ export async function saveSettings(patch: Partial<AgentSettings>): Promise<Agent
   };
   await settingsItem.setValue(next);
   return next;
+}
+
+export async function loadMcpConfig(): Promise<McpConfig> {
+  const stored = await mcpConfigItem.getValue();
+  const parsed = mcpConfigSchema.safeParse(stored);
+  return parsed.success ? parsed.data : EMPTY_MCP_CONFIG;
+}
+
+export async function saveMcpConfig(config: McpConfig): Promise<McpConfig> {
+  const parsed = mcpConfigSchema.parse(config);
+  await mcpConfigItem.setValue(parsed);
+  return parsed;
 }
 
 export async function loadSecrets(): Promise<SecretMap> {
