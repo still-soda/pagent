@@ -41,6 +41,17 @@ import { isSparseStore } from '@/features/agent/session/conversations';
 import { conversationVaultKey } from '@/features/agent/session/vault';
 import type { AgentSettings } from '@/shared/contracts/settings';
 import type { PageConversationStore } from '@/shared/contracts/session';
+import type { RecordedAction } from '@/shared/contracts/teaching';
+import { loadCommands } from '@/features/teaching/storage';
+import {
+  appendTeachingActions,
+  cancelTeaching,
+  confirmTeaching,
+  finishTeaching,
+  reviseTeaching,
+  startTeaching,
+  teachingContext,
+} from '@/features/teaching/background/teaching-controller';
 import {
   findRunningByTab,
   retargetAgent,
@@ -250,6 +261,34 @@ export async function handleRpc(name: RpcName, payload: unknown, senderTabId?: n
         await writeTabStore(tabId, incoming, senderUrl ?? currentUrl);
       }
       return { ok: true };
+    }
+    case 'teaching.start': {
+      const data = parseRpcPayload('teaching.start', payload);
+      return startTeaching({ tabId, url: data.url, conversationId: data.conversationId });
+    }
+    case 'teaching.context':
+      return { session: await teachingContext() };
+    case 'teaching.append': {
+      const data = parseRpcPayload('teaching.append', payload);
+      return appendTeachingActions((data.actions as RecordedAction[]).map((action) => ({
+        ...action,
+        tabId: action.tabId ?? tabId,
+      })));
+    }
+    case 'teaching.finish':
+      return finishTeaching();
+    case 'teaching.cancel':
+      await cancelTeaching();
+      return { ok: true };
+    case 'teaching.revise':
+      return reviseTeaching(parseRpcPayload('teaching.revise', payload).request);
+    case 'teaching.confirm':
+      return confirmTeaching();
+    case 'commands.list': {
+      const data = parseRpcPayload('commands.list', payload);
+      const url = data.url ?? await resolveTabUrl(tabId);
+      const domain = url ? conversationVaultKey(url) : null;
+      return domain ? loadCommands(domain) : [];
     }
     case 'agent.stop':
       stopAgent(parseRpcPayload('agent.stop', payload).tabId ?? tabId);

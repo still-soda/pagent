@@ -194,6 +194,23 @@ export const rpcSchemas = {
     deletedConversationIds: z.array(z.string()).optional(),
     url: z.string().optional(),
   }),
+  'teaching.start': z.object({
+    url: z.string().url(),
+    conversationId: z.string().optional(),
+  }),
+  'teaching.context': z.object({}),
+  'teaching.append': z.object({
+    actions: z.array(z.any()).max(100),
+  }),
+  'teaching.finish': z.object({}),
+  'teaching.cancel': z.object({}),
+  'teaching.revise': z.object({
+    request: z.string().min(1).max(4000),
+  }),
+  'teaching.confirm': z.object({}),
+  'commands.list': z.object({
+    url: z.string().optional(),
+  }),
 } as const;
 
 export type RpcName = keyof typeof rpcSchemas;

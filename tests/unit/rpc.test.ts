@@ -125,6 +125,24 @@ describe('rpc schemas', () => {
     });
   });
 
+  it('validates teaching and vault command payloads', () => {
+    expect(parseRpcPayload('teaching.start', {
+      url: 'https://example.com/form',
+      conversationId: 'c1',
+    })).toEqual({
+      url: 'https://example.com/form',
+      conversationId: 'c1',
+    });
+    expect(parseRpcPayload('teaching.revise', { request: '合并前两步' })).toEqual({
+      request: '合并前两步',
+    });
+    expect(parseRpcPayload('commands.list', { url: 'https://example.com' })).toEqual({
+      url: 'https://example.com',
+    });
+    expect(() => parseRpcPayload('teaching.start', { url: 'not-a-url' })).toThrow();
+    expect(() => parseRpcPayload('teaching.revise', { request: '' })).toThrow();
+  });
+
   it('identifies rpc envelopes', () => {
     expect(
       isRpcRequest({
