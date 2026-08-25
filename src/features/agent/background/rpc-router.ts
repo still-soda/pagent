@@ -109,8 +109,10 @@ export async function handleRpc(name: RpcName, payload: unknown, senderTabId?: n
     }
     case 'screenshot.capture': {
       const data = parseRpcPayload('screenshot.capture', payload);
-      if (data.fullPage) return trimDataUrl(await captureCdpScreenshot(tabId, true));
-      return trimDataUrl(await captureVisibleTab((await browser.tabs.get(tabId)).windowId));
+      const screenshot = data.fullPage
+        ? await captureCdpScreenshot(tabId, true)
+        : await captureVisibleTab((await browser.tabs.get(tabId)).windowId);
+      return data.raw ? screenshot : trimDataUrl(screenshot);
     }
     case 'permissions.get':
       return getPermissionState();
@@ -178,7 +180,14 @@ export async function handleRpc(name: RpcName, payload: unknown, senderTabId?: n
     }
     case 'agent.start': {
       const data = parseRpcPayload('agent.start', payload);
-      return startAgent(data.tabId ?? tabId, data.prompt, data.conversationId, data.history, data.context);
+      return startAgent(
+        data.tabId ?? tabId,
+        data.prompt,
+        data.conversationId,
+        data.history,
+        data.context,
+        data.imageDataUrl,
+      );
     }
     case 'session.context': {
       const data = parseRpcPayload('session.context', payload);

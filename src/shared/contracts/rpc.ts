@@ -137,7 +137,10 @@ export const rpcSchemas = {
   'tabs.create': z.object({ url: z.string().optional() }),
   'tabs.switch': tabPayloadSchema,
   'tabs.close': tabPayloadSchema,
-  'screenshot.capture': z.object({ fullPage: z.boolean().optional() }),
+  'screenshot.capture': z.object({
+    fullPage: z.boolean().optional(),
+    raw: z.boolean().optional(),
+  }),
   'permissions.get': z.object({}),
   'permissions.request': z.object({
     allSites: z.boolean().optional(),
@@ -167,6 +170,7 @@ export const rpcSchemas = {
   'agent.start': z.object({
     prompt: z.string().min(1),
     context: z.string().optional(),
+    imageDataUrl: z.string().startsWith('data:image/').optional(),
     tabId: z.number().int().optional(),
     conversationId: z.string().optional(),
     history: z.array(z.any()).optional(),

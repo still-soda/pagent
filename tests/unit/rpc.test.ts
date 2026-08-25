@@ -71,6 +71,25 @@ describe('rpc schemas', () => {
     });
   });
 
+  it('accepts raw screenshots and image attachments', () => {
+    expect(parseRpcPayload('screenshot.capture', { raw: true })).toEqual({ raw: true });
+    expect(
+      parseRpcPayload('agent.start', {
+        prompt: '查看标记',
+        imageDataUrl: 'data:image/png;base64,abc',
+      }),
+    ).toMatchObject({
+      prompt: '查看标记',
+      imageDataUrl: 'data:image/png;base64,abc',
+    });
+    expect(() =>
+      parseRpcPayload('agent.start', {
+        prompt: '查看标记',
+        imageDataUrl: 'https://example.com/image.png',
+      }),
+    ).toThrow();
+  });
+
   it('limits the tabs requested for mention snapshots', () => {
     expect(parseRpcPayload('tabs.snapshot', { tabIds: [2, 5] })).toEqual({ tabIds: [2, 5] });
     expect(() => parseRpcPayload('tabs.snapshot', { tabIds: [] })).toThrow();

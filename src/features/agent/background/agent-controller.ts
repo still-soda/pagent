@@ -90,6 +90,7 @@ export async function startAgent(
   conversationId?: string,
   history?: ChatMessage[],
   context?: string,
+  imageDataUrl?: string,
 ) {
   stopAgent(tabId);
   const abort = new AbortController();
@@ -106,9 +107,11 @@ export async function startAgent(
     target.messages = history ?? [];
     conversations = [...conversations, target];
   }
+  const lastMessage = target.messages.at(-1);
   const hasPrompt =
-    target.messages.at(-1)?.role === 'user' &&
-    target.messages.at(-1)?.content.trim() === prompt.trim();
+    lastMessage?.role === 'user' &&
+    lastMessage.content.trim() === prompt.trim() &&
+    lastMessage.imageDataUrl === imageDataUrl;
   const revision = nextStoreRevision(existing);
   conversations = conversations.map((item) =>
     item.id === targetId
@@ -119,7 +122,10 @@ export async function startAgent(
           title: titleFromPrompt(item.title, prompt),
           messages: hasPrompt
             ? item.messages
-            : [...item.messages, { id: nowId('m'), role: 'user' as const, content: prompt }],
+            : [
+                ...item.messages,
+                { id: nowId('m'), role: 'user' as const, content: prompt, imageDataUrl },
+              ],
           running: true,
           thinking: '正在调用模型…',
           error: '',
@@ -153,6 +159,7 @@ export async function startAgent(
     sessionId,
     conversationId: targetId,
     history,
+    imageDataUrl,
     bridge: createBridge(control, settings, retargetAgent),
     emit: (event) => {
       if (!isCurrent()) return;

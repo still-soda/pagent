@@ -263,8 +263,24 @@ export function settleAssistantMessages(
 export function toModelMessages(
   history: ChatMessage[],
   prompt?: string,
-): Array<{ role: 'user' | 'assistant'; content: string }> {
-  const converted: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+): Array<{
+  role: 'user' | 'assistant';
+  content:
+    | string
+    | Array<
+        | { type: 'text'; text: string }
+        | { type: 'image_url'; image_url: { url: string } }
+      >;
+}> {
+  const converted: Array<{
+    role: 'user' | 'assistant';
+    content:
+      | string
+      | Array<
+          | { type: 'text'; text: string }
+          | { type: 'image_url'; image_url: { url: string } }
+        >;
+  }> = [];
   for (const message of history) {
     if (message.role !== 'user' && message.role !== 'assistant') continue;
     let content = message.content.trim();
@@ -273,11 +289,32 @@ export function toModelMessages(
       if (tools.length) content = `已执行：${tools.map((tool) => toolLabel(tool.name)).join('、')}`;
     }
     if (!content) continue;
-    converted.push({ role: message.role, content });
+    converted.push({
+      role: message.role,
+      content:
+        message.role === 'user' && message.imageDataUrl
+          ? modelUserContent(content, message.imageDataUrl)
+          : content,
+    });
   }
   const last = converted.at(-1);
-  if (prompt && last?.role === 'user' && last.content === prompt.trim()) {
+  const lastText =
+    typeof last?.content === 'string'
+      ? last.content
+      : last?.content.find((part) => part.type === 'text')?.text;
+  if (prompt && last?.role === 'user' && lastText === prompt.trim()) {
     converted.pop();
   }
   return converted;
+}
+
+export function modelUserContent(prompt: string, imageDataUrl?: string) {
+  if (!imageDataUrl) return prompt;
+  return [
+    { type: 'text' as const, text: prompt },
+    {
+      type: 'image_url' as const,
+      image_url: { url: imageDataUrl },
+    },
+  ];
 }

@@ -43,7 +43,7 @@ export function useConversationActions(options: {
     bumpRevision,
   } = options;
 
-  const send = useCallback(async (prompt: string, context?: string) => {
+  const send = useCallback(async (prompt: string, context?: string, imageDataUrl?: string) => {
     const id = activeIdRef.current;
     runningIdRef.current = id;
     setWorkingOnThisPage(true);
@@ -58,7 +58,10 @@ export function useConversationActions(options: {
       running: true,
       thinking: '正在调用模型…',
       title: titleFromPrompt(item.title, prompt),
-      messages: [...item.messages, { id: nowId('m'), role: 'user', content: prompt }],
+      messages: [
+        ...item.messages,
+        { id: nowId('m'), role: 'user', content: prompt, imageDataUrl },
+      ],
     }));
     conversationsRef.current = nextConversations;
     setConversations(nextConversations);
@@ -70,7 +73,13 @@ export function useConversationActions(options: {
       sessionId: sessionIdRef.current,
       deletedConversationIds: [...deletedConversationIdsRef.current],
     });
-    await rpc('agent.start', { prompt, context, conversationId: id, history });
+    await rpc('agent.start', {
+      prompt,
+      context,
+      imageDataUrl,
+      conversationId: id,
+      history,
+    });
   }, [
     activeIdRef,
     bumpRevision,

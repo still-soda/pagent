@@ -38,6 +38,7 @@ export type ChatMessage = {
   id: string;
   role: ChatRole;
   content: string;
+  imageDataUrl?: string;
   thinking?: string;
   tools?: ChatToolCall[];
   parts?: AssistantPart[];

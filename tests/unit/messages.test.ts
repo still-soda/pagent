@@ -126,6 +126,30 @@ describe('assistant message parts', () => {
     ]);
   });
 
+  it('keeps annotated screenshots as multimodal model history', () => {
+    expect(
+      toModelMessages([
+        {
+          id: 'u1',
+          role: 'user',
+          content: '看这里',
+          imageDataUrl: 'data:image/png;base64,abc',
+        },
+      ]),
+    ).toEqual([
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: '看这里' },
+          {
+            type: 'image_url',
+            image_url: { url: 'data:image/png;base64,abc' },
+          },
+        ],
+      },
+    ]);
+  });
+
   it('keeps thinking blocks before later tools and text', () => {
     let messages: ChatMessage[] = [];
     messages = applyAssistantThinking(messages, '先观察页面。', 'm1');

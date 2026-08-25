@@ -15,6 +15,7 @@ import {
   applyAssistantToolResult,
   applyAssistantToolStart,
   applyAssistantUsage,
+  modelUserContent,
   toModelMessages,
 } from '@/features/agent/session/messages';
 import { emptyTurnUsage, preferRicherUsage, withTurnTiming } from './usage';
@@ -30,6 +31,7 @@ export type RuntimeHandle = {
 export async function runAgent(options: {
   prompt: string;
   context?: string;
+  imageDataUrl?: string;
   tabId: number;
   getTabId?: () => number;
   sessionId?: string;
@@ -47,7 +49,12 @@ export async function runAgent(options: {
   const history = options.history ?? [];
   let messages: ChatMessage[] = [
     ...history,
-    { id: nowId('m'), role: 'user', content: options.prompt },
+    {
+      id: nowId('m'),
+      role: 'user',
+      content: options.prompt,
+      imageDataUrl: options.imageDataUrl,
+    },
   ];
   let emitUsage = () => {};
 
@@ -128,7 +135,10 @@ export async function runAgent(options: {
       {
         messages: [
           ...toModelMessages(history, options.prompt),
-          { role: 'user', content: options.prompt },
+          {
+            role: 'user',
+            content: modelUserContent(options.prompt, options.imageDataUrl),
+          },
         ],
       },
       {
