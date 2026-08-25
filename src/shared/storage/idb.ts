@@ -1,11 +1,13 @@
 const DB_NAME = 'pagent';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export const SESSION_STORES = {
   conversations: 'conversations',
   vaults: 'vaults',
   tabUi: 'tabUi',
   meta: 'meta',
+  teaching: 'teaching',
+  commands: 'commands',
 } as const;
 
 export type SessionStoreName = (typeof SESSION_STORES)[keyof typeof SESSION_STORES];
