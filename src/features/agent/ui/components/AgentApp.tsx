@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import { IconSparkles } from '@tabler/icons-react';
 import { useAgentSession } from '../hooks/useAgentSession';
 import { ScreenAnnotator } from '@/features/canvas/ScreenAnnotator';
 import { ElementPicker } from '@/features/canvas/ElementPicker';
@@ -303,7 +302,12 @@ export function AgentApp({
           >
             {session.agentActive ? <span className="pagent-fab-halo" aria-hidden /> : null}
             <span className="pagent-fab-face">
-              <IconSparkles className="size-6" />
+              <svg className="pagent-fab-icon" viewBox="0 0 24 24" aria-hidden>
+                <path
+                  fill="currentColor"
+                  d="M11.05 2.3a1 1 0 0 1 1.9 0l.62 1.89a9.4 9.4 0 0 0 5.94 5.94l1.89.62a1 1 0 0 1 0 1.9l-1.89.62a9.4 9.4 0 0 0-5.94 5.94l-.62 1.89a1 1 0 0 1-1.9 0l-.62-1.89a9.4 9.4 0 0 0-5.94-5.94l-1.89-.62a1 1 0 0 1 0-1.9l1.89-.62a9.4 9.4 0 0 0 5.94-5.94l.62-1.89Z"
+                />
+              </svg>
             </span>
           </button>
         </div>
