@@ -124,10 +124,17 @@ export default function ThinkingState({
   const expanded = manualExpanded ?? autoExpanded;
   const visible = live ? v.rows.length : stage < 2 ? 0 : stage === 2 ? Math.min(2, v.rows.length) : v.rows.length;
   const traceRef = useRef<HTMLDivElement>(null);
+  const reasoningRef = useRef<HTMLSpanElement>(null);
   const [lineHeight, setLineHeight] = useState(0);
   useLayoutEffect(() => {
     if (traceRef.current) setLineHeight(traceRef.current.offsetHeight);
   }, [visible, expanded, variant, stage]);
+
+  useLayoutEffect(() => {
+    if (!working || variant !== "Reasoning") return;
+    const reasoning = reasoningRef.current;
+    if (reasoning) reasoning.scrollTop = reasoning.scrollHeight;
+  }, [text, working, expanded, variant]);
 
   /* let embedders sequence content after the trace settles */
   const settledRef = useRef(false);
@@ -227,7 +234,10 @@ export default function ThinkingState({
                     <span className="size-3 shrink-0 rounded-full border-[1.5px] border-line-strong border-t-ink-2" style={{ animation: "spin 700ms linear infinite" }} />
                   )
                 )}
-                <span className={`min-w-0 text-[12.5px] ${variant === "Reasoning" ? "max-h-48 overflow-y-auto whitespace-pre-wrap leading-relaxed text-ink-2" : "truncate font-medium text-ink"} ${variant === "Search" ? "animated-underline" : ""}`}>
+                <span
+                  ref={variant === "Reasoning" ? reasoningRef : undefined}
+                  className={`min-w-0 text-[12.5px] ${variant === "Reasoning" ? "max-h-48 overflow-y-auto whitespace-pre-wrap leading-relaxed text-ink-2" : "truncate font-medium text-ink"} ${variant === "Search" ? "animated-underline" : ""}`}
+                >
                   {row.primary}
                 </span>
                 {row.secondary && (

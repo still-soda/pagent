@@ -76,15 +76,11 @@ function TurnUsageBar({ usage }: { usage: TurnUsage }) {
   if (!parts.length) return null;
   return (
     <div
-      className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] tabular-nums text-ink-3"
+      className="max-w-full truncate whitespace-nowrap text-[11px] tabular-nums text-ink-3"
       aria-label={`本轮用量：${parts.join(' · ')}`}
+      title={parts.join(' · ')}
     >
-      {parts.map((part, index) => (
-        <span key={`${part}-${index}`} className="inline-flex items-center gap-1.5">
-          {index > 0 ? <span aria-hidden className="text-ink-3/70">·</span> : null}
-          {part}
-        </span>
-      ))}
+      {parts.join(' · ')}
     </div>
   );
 }
