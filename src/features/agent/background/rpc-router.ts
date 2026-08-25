@@ -37,6 +37,8 @@ import {
   insertText,
 } from '@/shared/browser/cdp';
 import { testModelConnection } from '@/features/agent/runtime/models';
+import { syncMcpServers } from '@/features/mcp/background/mcp-manager';
+import { saveMcpConfig } from '@/shared/storage/storage';
 import { isSparseStore } from '@/features/agent/session/conversations';
 import { conversationVaultKey } from '@/features/agent/session/vault';
 import type { AgentSettings } from '@/shared/contracts/settings';
@@ -168,6 +170,15 @@ export async function handleRpc(name: RpcName, payload: unknown, senderTabId?: n
       return settings;
     case 'settings.set':
       return saveSettings(parseRpcPayload('settings.set', payload) as Partial<AgentSettings>);
+    case 'mcp.getState':
+      return syncMcpServers(false);
+    case 'mcp.setConfig': {
+      const data = parseRpcPayload('mcp.setConfig', payload);
+      await saveMcpConfig(data.config);
+      return syncMcpServers(true);
+    }
+    case 'mcp.sync':
+      return syncMcpServers(true);
     case 'secrets.set': {
       const data = parseRpcPayload('secrets.set', payload);
       await saveSecret(data.provider, data.apiKey);

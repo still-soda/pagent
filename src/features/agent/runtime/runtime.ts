@@ -44,7 +44,7 @@ export async function runAgent(options: {
   const settings = await loadSettings();
   const secrets = await loadSecrets();
   const model = createChatModel(settings, secrets);
-  const tools = createAgentTools({ ...options.bridge, settings });
+  const tools = await createAgentTools({ ...options.bridge, settings });
   let streamUsage = emptyTurnUsage();
   const history = options.history ?? [];
   let messages: ChatMessage[] = [

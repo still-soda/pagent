@@ -8,6 +8,7 @@ import { archiveTabNavigation, clearTabStoreState } from '@/features/agent/backg
 import { running, stopAgentForTab } from '@/features/agent/background/agent-controller';
 import { handleRpc } from '@/features/agent/background/rpc-router';
 import { recoverInterruptedSessions } from '@/features/agent/background/session-recovery';
+import { syncMcpServers } from '@/features/mcp/background/mcp-manager';
 import { togglePanel } from '@/features/agent/background/content-bridge';
 import { recordBrowserAction } from '@/features/teaching/background/teaching-controller';
 
@@ -15,6 +16,7 @@ export default defineBackground(() => {
   installServiceWorkerKeepAlive();
   void migrateLegacyPageStores().catch(() => {});
   void recoverInterruptedSessions().catch(() => {});
+  void syncMcpServers().catch((error) => console.warn('MCP 连接失败', error));
 
   browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     if (changeInfo.url) {

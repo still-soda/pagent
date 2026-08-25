@@ -23,6 +23,7 @@ import {
   switchTab,
 } from '@/shared/browser/tabs';
 import { captureVisibleTab, trimDataUrl } from '@/shared/browser/screenshot';
+import { callMcpTool, listMcpTools } from '@/features/mcp/background/mcp-manager';
 import type { AgentSettings } from '@/shared/contracts/settings';
 import type { AgentControl } from './agent-controller';
 
@@ -148,6 +149,10 @@ export function createBridge(
       console: (filter?: Parameters<typeof getConsoleLog>[1]) => getConsoleLog(tabId(), filter),
       request: (requestId: string, includeBody?: boolean) =>
         getNetworkRequest(tabId(), requestId, includeBody),
+    },
+    mcp: {
+      listTools: listMcpTools,
+      callTool: (name: string, args: unknown) => callMcpTool(name, args),
     },
   };
 }

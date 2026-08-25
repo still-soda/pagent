@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { API_PROTOCOLS, PROVIDER_IDS } from './settings';
 import { NAMED_SCRIPTS, SOURCE_TYPES } from './page';
+import { mcpConfigSchema } from './mcp';
 import { CHANNEL } from './channel';
 
 export { CHANNEL } from './channel';
@@ -158,6 +159,11 @@ export const rpcSchemas = {
   'cdp.networkRequest': networkRequestPayloadSchema,
   'settings.get': z.object({}),
   'settings.set': z.object({}).passthrough(),
+  'mcp.getState': z.object({}),
+  'mcp.setConfig': z.object({
+    config: mcpConfigSchema,
+  }),
+  'mcp.sync': z.object({}),
   'secrets.set': z.object({
     provider: z.enum(PROVIDER_IDS),
     apiKey: z.string(),

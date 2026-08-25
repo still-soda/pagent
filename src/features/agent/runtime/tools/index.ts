@@ -2,8 +2,10 @@ import { tool } from 'langchain';
 import { z } from 'zod';
 import { assertNavigableUrl } from '@/shared/contracts/policy';
 import { isolateUntrustedPage } from '@/features/agent/runtime/middleware';
+import { jsonSchemaToZod } from '@/features/mcp/json-schema-to-zod';
 import { safeJson, truncate } from '@/shared/utils/utils';
 import type { AgentSettings } from '@/shared/contracts/settings';
+import type { McpToolMeta } from '@/shared/contracts/mcp';
 
 export type ToolBridge = {
   tabId: number;
@@ -39,9 +41,47 @@ export type ToolBridge = {
     }) => Promise<unknown>;
     request: (requestId: string, includeBody?: boolean) => Promise<unknown>;
   };
+  mcp: {
+    listTools: () => Promise<McpToolMeta[]>;
+    callTool: (name: string, args: unknown) => Promise<string>;
+  };
 };
 
-export function createAgentTools(bridge: ToolBridge) {
+/** 内置工具名集合，MCP 工具展示名与其冲突时自动加服务器前缀 */
+export const BUILTIN_TOOL_NAMES: ReadonlySet<string> = new Set([
+  'observe_page',
+  'search_page_text',
+  'capture_screenshot',
+  'click_element',
+  'dblclick_element',
+  'hover_element',
+  'type_text',
+  'clear_field',
+  'select_option',
+  'drag_element',
+  'press_key',
+  'scroll_page',
+  'wait_for',
+  'highlight_element',
+  'navigate',
+  'go_back',
+  'go_forward',
+  'reload_page',
+  'page_info',
+  'get_source',
+  'list_tabs',
+  'open_tab',
+  'switch_tab',
+  'close_tab',
+  'execute_named_script',
+  'execute_cdp_script',
+  'cdp_click_xy',
+  'get_network_log',
+  'get_console_log',
+  'get_network_request',
+]);
+
+export async function createAgentTools(bridge: ToolBridge) {
   const observe = tool(
     async ({ reason, maxElements }) => {
       const observation = await bridge.content('dom.observe', { reason, maxElements });
@@ -474,5 +514,28 @@ export function createAgentTools(bridge: ToolBridge) {
     networkLog,
     consoleLog,
     networkRequest,
+    ...(await createMcpAgentTools(bridge)),
   ];
+}
+
+async function createMcpAgentTools(bridge: ToolBridge) {
+  let listed: McpToolMeta[] = [];
+  try {
+    listed = await bridge.mcp.listTools();
+  } catch (error) {
+    listed = [];
+  }
+  return listed.map((meta) =>
+    tool(
+      async (args) =>
+        isolateUntrustedPage(truncate(await bridge.mcp.callTool(meta.name, args), 12_000)),
+      {
+        name: meta.name,
+        description: meta.description
+          ? truncate(meta.description, 800)
+          : '外部 MCP 服务器提供的工具',
+        schema: jsonSchemaToZod(meta.inputSchema),
+      },
+    ),
+  );
 }
