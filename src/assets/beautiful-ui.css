@@ -396,6 +396,8 @@
 }
 
 .pagent-fab {
+  --fab-look-x: 0;
+  --fab-look-y: 0;
   position: absolute;
   inset: 0;
   display: grid;
@@ -461,21 +463,44 @@
   pointer-events: none;
 }
 
-.pagent-fab-icon {
+.pagent-fab-eyes {
   position: relative;
   z-index: 2;
-  width: 21px;
-  height: 21px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   filter: drop-shadow(0 1px 3px oklch(0.19 0.08 270 / 0.38));
+  transform: translate(
+    calc(var(--fab-look-x) * 5px),
+    calc(var(--fab-look-y) * 4px)
+  );
   transition: transform 220ms var(--ease-out-strong);
+}
+
+.pagent-fab-eye {
+  width: 6px;
+  height: 17px;
+  border-radius: 999px;
+  background: currentcolor;
+  box-shadow: inset 0 -1px 1px oklch(0.7 0.08 260 / 0.22);
+  transform-origin: center;
+}
+
+.pagent-fab.is-idle .pagent-fab-eye {
+  animation: pagent-fab-blink 15s ease-in-out infinite;
 }
 
 .pagent-fab:hover .pagent-fab-face {
   filter: saturate(1.08) brightness(1.06);
 }
 
-.pagent-fab:hover .pagent-fab-icon {
-  transform: scale(1.06) rotate(-4deg);
+.pagent-fab:hover .pagent-fab-eyes {
+  transform:
+    translate(
+      calc(var(--fab-look-x) * 5px),
+      calc(var(--fab-look-y) * 4px - 1px)
+    )
+    scale(1.06);
 }
 
 .pagent-fab-halo {
@@ -505,6 +530,11 @@
 
 @keyframes pagent-halo-spin {
   to { transform: rotate(360deg); }
+}
+
+@keyframes pagent-fab-blink {
+  0%, 93%, 97%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(.08); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -848,4 +878,158 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .stream-caret { animation: none; }
+}
+
+/* Teaching recorder */
+.pagent-teaching-orb-wrap {
+  --look-x: 0;
+  --look-y: 0;
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 2147483647;
+  pointer-events: auto;
+  perspective: 420px;
+}
+
+.pagent-teaching-orb {
+  position: relative;
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  overflow: visible;
+  border: 1px solid color-mix(in oklch, var(--primary) 72%, white);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 34% 28%, color-mix(in oklch, var(--primary) 55%, white), transparent 30%),
+    linear-gradient(145deg, color-mix(in oklch, var(--primary) 84%, white), var(--primary));
+  box-shadow: 0 12px 30px color-mix(in oklch, var(--primary) 32%, transparent), inset 0 -8px 14px rgb(0 0 0 / 14%);
+  cursor: pointer;
+  transform:
+    rotateX(calc(var(--look-y) * -7deg))
+    rotateY(calc(var(--look-x) * 7deg));
+  transition: transform 100ms ease-out, filter 160ms ease;
+}
+
+.pagent-teaching-orb:hover { filter: brightness(1.06); }
+
+.pagent-teaching-face {
+  display: flex;
+  gap: 8px;
+  transform: translate(calc(var(--look-x) * 4px), calc(var(--look-y) * 3px));
+  transition: transform 90ms ease-out;
+}
+
+.pagent-teaching-eye {
+  width: 5px;
+  height: 17px;
+  border-radius: 999px;
+  background: white;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 16%);
+  transform: rotate(calc(var(--look-x) * -5deg));
+}
+
+.pagent-teaching-pulse {
+  position: absolute;
+  inset: -5px;
+  border: 1px solid color-mix(in oklch, var(--primary) 62%, transparent);
+  border-radius: inherit;
+  animation: pagent-teaching-pulse 1.8s ease-out infinite;
+}
+
+.pagent-teaching-orb-wrap.is-summarizing .pagent-teaching-orb {
+  cursor: wait;
+  animation: pagent-teaching-thinking 1.1s ease-in-out infinite;
+}
+
+.pagent-teaching-menu {
+  position: absolute;
+  right: 0;
+  bottom: 68px;
+  display: grid;
+  width: 176px;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface);
+  box-shadow: var(--shadow-raised);
+  color: var(--ink);
+}
+
+.pagent-teaching-menu > div { display: flex; flex-direction: column; gap: 2px; padding: 2px 3px 6px; }
+.pagent-teaching-menu strong { font-size: 12.5px; }
+.pagent-teaching-menu span { color: var(--ink-3); font-size: 11px; }
+.pagent-teaching-menu button,
+.pagent-flow-actions button {
+  display: flex;
+  min-height: 31px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 8px;
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+.pagent-teaching-menu button:hover,
+.pagent-flow-actions button:hover { background: var(--hover); color: var(--ink); }
+.pagent-teaching-menu button.is-primary,
+.pagent-flow-actions button.is-primary { background: var(--primary); color: var(--primary-foreground); }
+
+.pagent-flow-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklch, var(--primary) 24%, var(--line));
+  border-radius: 14px;
+  background: color-mix(in oklch, var(--surface) 94%, var(--primary));
+  padding: 12px;
+  box-shadow: var(--shadow-card);
+}
+
+.pagent-flow-card-title { display: flex; align-items: flex-start; gap: 9px; color: var(--primary); }
+.pagent-flow-card-title > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.pagent-flow-card-title strong { color: var(--ink); font-size: 13px; }
+.pagent-flow-card-title span { color: var(--ink-3); font-size: 11.5px; line-height: 1.4; }
+.pagent-flow-summary { display: flex; flex-direction: column; gap: 7px; }
+.pagent-flow-summary > div:first-child { display: flex; align-items: center; justify-content: space-between; color: var(--ink-3); font-size: 11px; }
+.pagent-flow-summary > div:first-child strong { border-radius: 6px; background: var(--field); padding: 3px 6px; color: var(--accent-ink); font-family: ui-monospace, monospace; }
+.pagent-flow-summary h3 { margin: 0; color: var(--ink); font-size: 14px; }
+.pagent-flow-summary p { margin: 0; color: var(--ink-2); font-size: 12px; line-height: 1.5; }
+.pagent-flow-prerequisites { display: flex; flex-wrap: wrap; gap: 4px; }
+.pagent-flow-prerequisites span { border-radius: 999px; background: var(--field); padding: 3px 7px; color: var(--ink-2); font-size: 10.5px; }
+.pagent-flow-summary ol { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; counter-reset: flow-step; }
+.pagent-flow-summary li { position: relative; display: flex; flex-direction: column; gap: 2px; padding-left: 25px; counter-increment: flow-step; }
+.pagent-flow-summary li::before { position: absolute; top: 0; left: 0; display: grid; width: 18px; height: 18px; place-items: center; border-radius: 50%; background: var(--field); color: var(--ink-3); content: counter(flow-step); font-size: 10px; }
+.pagent-flow-summary li strong { color: var(--ink); font-size: 11.5px; }
+.pagent-flow-summary li span { color: var(--ink-3); font-size: 11px; line-height: 1.4; }
+.pagent-flow-prompt { border-radius: 8px; background: var(--field); padding: 7px 9px; color: var(--ink-2); font-size: 11px; }
+.pagent-flow-prompt summary { cursor: pointer; font-weight: 600; }
+.pagent-flow-prompt p { margin: 7px 0 0; white-space: pre-wrap; line-height: 1.5; }
+.pagent-flow-records-toggle { display: flex; align-items: center; justify-content: space-between; color: var(--ink-3); font-size: 11px; }
+.pagent-flow-records { display: grid; max-height: 180px; gap: 5px; overflow-y: auto; }
+.pagent-flow-records > div { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 4px 7px; border-bottom: 1px solid var(--line); padding: 5px 0; font-size: 10.5px; }
+.pagent-flow-records span { color: var(--accent-ink); }
+.pagent-flow-records p { min-width: 0; margin: 0; overflow: hidden; color: var(--ink-2); text-overflow: ellipsis; white-space: nowrap; }
+.pagent-flow-records code { grid-column: 2; overflow: hidden; color: var(--ink-3); text-overflow: ellipsis; white-space: nowrap; }
+.pagent-flow-revision { border-left: 2px solid var(--primary); padding-left: 8px; color: var(--ink-3); font-size: 11px; }
+.pagent-flow-actions { display: grid; grid-template-columns: 1fr 1.35fr; gap: 7px; padding-top: 2px; }
+.pagent-flow-actions button:disabled { cursor: wait; opacity: .55; }
+@keyframes pagent-teaching-pulse {
+  from { opacity: .8; transform: scale(.9); }
+  to { opacity: 0; transform: scale(1.25); }
+}
+
+@keyframes pagent-teaching-thinking {
+  0%, 100% { transform: scale(.94) rotate(-3deg); }
+  50% { transform: scale(1.04) rotate(3deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pagent-teaching-orb { transform: none; transition: none; }
+  .pagent-teaching-pulse,
+  .pagent-teaching-orb-wrap.is-summarizing .pagent-teaching-orb { animation: none; }
 }
