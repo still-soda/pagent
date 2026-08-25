@@ -8,6 +8,7 @@ import {
   IconBrowser,
   IconCommand,
   IconPlus,
+  IconPlayerRecord,
   IconPointer,
   IconScreenshot,
   IconX,
@@ -15,6 +16,8 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { rpc } from '@/shared/extension/rpc-client';
 import type { ObservedElement } from '@/shared/contracts/page';
+import type { SavedCommand } from '@/shared/contracts/teaching';
+import { Badge } from '@/shared/ui/badge';
 import {
   applyComposerInsertion,
   clampMentionMenuHeight,
@@ -25,7 +28,6 @@ import {
   filterSlashCommands,
   normalizeBrowserTabs,
   parseComposerToken,
-  SLASH_COMMANDS,
   tabHost,
   type BrowserTab,
   type MentionedTabSnapshot,
@@ -46,7 +48,7 @@ const RAINBOW = accentChain([
 
 /* ─────────────────────────────────────────────────────────
  * PROMPT BAR
- * A composer with real controls: @ browser tabs,
+ * A composer with real controls: + features, @ browser tabs,
  * / commands, a model picker, and send.
  * Type @ or / to open the menus; ↑↓ + Enter to pick.
  * Variants: Rounded (card radius) · Pill (full radius).
@@ -67,6 +69,7 @@ type MenuRow = {
   command?: SlashCommand;
   screenMark?: boolean;
   elementSelect?: boolean;
+  teachingStart?: boolean;
 };
 
 type PromptModel = { key: string; name: string; tag: string };
@@ -110,6 +113,7 @@ export default function PromptBar({
   selectingElement = false,
   onSelectElement,
   onRemoveElement,
+  onStartTeaching,
 }: {
   variant?: string;
   /** the self-running walkthrough; turn off when embedding in a real surface */
@@ -128,6 +132,7 @@ export default function PromptBar({
   selectingElement?: boolean;
   onSelectElement?: () => void;
   onRemoveElement?: () => void;
+  onStartTeaching?: () => void;
 }) {
   const pill = variant === "Pill";
   const [draft, setDraft] = useState("");
@@ -139,6 +144,8 @@ export default function PromptBar({
   const [tabs, setTabs] = useState<BrowserTab[]>(demo ? DEMO_TABS : []);
   const [tabsLoading, setTabsLoading] = useState(false);
   const [tabsError, setTabsError] = useState("");
+  const [savedCommands, setSavedCommands] = useState<SavedCommand[]>([]);
+  const [selectedCommand, setSelectedCommand] = useState<SlashCommand | null>(null);
   const [preparing, setPreparing] = useState(false);
   const [active, setActive] = useState(0);
   const [auto, setAuto] = useState(demo);
@@ -166,35 +173,51 @@ export default function PromptBar({
   };
 
   const token = dismissed ? null : parseComposerToken(draft);
-  const menu: "at" | "slash" | null = plusOpen ? "at" : token?.kind ?? null;
+  const menu: "plus" | "at" | "slash" | null = plusOpen ? "plus" : token?.kind ?? null;
   const query = plusOpen ? "" : token?.query ?? "";
 
   const rows: MenuRow[] =
-    menu === "at"
+    menu === "plus"
       ? [
-          ...(plusOpen
-            ? [{
-                key: "select-element",
-                name: "选择元素",
-                desc: "在页面上点击选择一个元素",
-                elementSelect: true,
-              }, {
-                key: "mark-screen",
-                name: "标记屏幕",
-                desc: "截取当前画面并绘制标记",
-                screenMark: true,
-              }]
-            : []),
-          ...filterBrowserTabs(tabs, query).map((tab) => ({
-            key: `tab-${tab.id}`,
-            name: tab.title,
-            desc: tabHost(tab.url),
-            badge: tab.active ? "当前" : mentions.some((item) => item.id === tab.id) ? "已选" : undefined,
-            tab,
-          })),
+          {
+            key: "select-element",
+            name: "选择元素",
+            desc: "在页面上点击选择一个元素",
+            elementSelect: true,
+          },
+          {
+            key: "mark-screen",
+            name: "标记屏幕",
+            desc: "截取当前画面并绘制标记",
+            screenMark: true,
+          },
+          {
+            key: "start-teaching",
+            name: "开始示教",
+            desc: "记录操作并编写可复用命令",
+            teachingStart: true,
+          },
         ]
-      : menu === "slash"
-        ? filterSlashCommands(SLASH_COMMANDS, query).map((command) => ({
+      : menu === "at"
+        ? [
+            ...filterBrowserTabs(tabs, query).map((tab) => ({
+              key: `tab-${tab.id}`,
+              name: tab.title,
+              desc: tabHost(tab.url),
+              badge: tab.active ? "当前" : mentions.some((item) => item.id === tab.id) ? "已选" : undefined,
+              tab,
+            })),
+          ]
+        : menu === "slash"
+        ? filterSlashCommands(
+            savedCommands.map((command) => ({
+              key: command.key,
+              name: command.name,
+              desc: command.desc,
+              prompt: command.prompt,
+            })),
+            query,
+          ).map((command) => ({
             key: command.key,
             name: command.name,
             desc: command.desc,
@@ -224,6 +247,19 @@ export default function PromptBar({
       .finally(() => {
         if (!cancelled) setTabsLoading(false);
       });
+    return () => {
+      cancelled = true;
+    };
+  }, [menu, demo]);
+
+  useEffect(() => {
+    if (menu !== "slash" || demo) return;
+    let cancelled = false;
+    void rpc("commands.list", { url: location.href })
+      .then((result) => {
+        if (!cancelled && Array.isArray(result)) setSavedCommands(result as SavedCommand[]);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -379,23 +415,36 @@ export default function PromptBar({
       setPlusOpen(false);
       onMarkScreen?.();
       return;
+    } else if (row.teachingStart) {
+      setPlusOpen(false);
+      onStartTeaching?.();
+      return;
     } else if (row.tab) {
       setMentions((current) => (current.some((item) => item.id === row.tab!.id) ? current : [...current, row.tab!]));
       setDraft(applyComposerInsertion(draft, token, ""));
     } else if (row.command) {
-      setDraft(applyComposerInsertion(draft, token, row.command.prompt));
+      setDraft(applyComposerInsertion(draft, token, ""));
+      setSelectedCommand(row.command);
     }
     setPlusOpen(false);
     setDismissed(false);
     inputRef.current?.focus();
   };
 
-  const canSend = !preparing && (draft.trim().length > 0 || mentions.length > 0 || Boolean(imageDataUrl) || Boolean(selectedElement));
+  const canSend = !preparing && (
+    draft.trim().length > 0
+    || mentions.length > 0
+    || Boolean(selectedCommand)
+    || Boolean(imageDataUrl)
+    || Boolean(selectedElement)
+  );
   const send = async () => {
     if (!canSend) return;
     const selectedMentions = [...mentions];
+    const selectedFlowCommand = selectedCommand;
     const text =
       visiblePrompt(draft, selectedMentions) ||
+      (selectedFlowCommand ? `执行命令 /${selectedFlowCommand.key}（${selectedFlowCommand.name}）` : "") ||
       (imageDataUrl
         ? "请分析我在屏幕截图中标记的内容。"
         : selectedElement
@@ -406,6 +455,7 @@ export default function PromptBar({
     setExpanded(false);
     setDraft("");
     setMentions([]);
+    setSelectedCommand(null);
     if (inputRef.current) {
       inputRef.current.style.height = "28px";
       inputRef.current.style.overflowY = "hidden";
@@ -413,6 +463,14 @@ export default function PromptBar({
     closeMenus();
     try {
       let context = mentionedTabsContext(selectedMentions) || undefined;
+      if (selectedFlowCommand) {
+        const commandContext = [
+          `用户选择了命令 /${selectedFlowCommand.key}（${selectedFlowCommand.name}）。`,
+          '以下是该命令封装的执行说明，请结合用户当前补充要求执行，不要向用户复述整段说明：',
+          selectedFlowCommand.prompt,
+        ].join('\n');
+        context = context ? `${context}\n\n${commandContext}` : commandContext;
+      }
       if (!demo && selectedMentions.length > 0) {
         try {
           const snapshots = (await rpc("tabs.snapshot", {
@@ -482,6 +540,8 @@ export default function PromptBar({
                       <IconPointer size={16} stroke={2} />
                     ) : row.screenMark ? (
                       <IconScreenshot size={16} stroke={2} />
+                    ) : row.teachingStart ? (
+                      <IconPlayerRecord size={16} stroke={2} />
                     ) : row.tab ? (
                       <IconBrowser size={16} stroke={2} />
                     ) : (
@@ -501,7 +561,9 @@ export default function PromptBar({
             ))}
             {rows.length === 0 && (
               <div className="flex h-9 items-center px-2 text-[12px] text-ink-3">
-                {menu === "at"
+                {menu === "plus"
+                  ? "没有可用功能"
+                  : menu === "at"
                   ? tabsLoading
                     ? "正在读取标签页…"
                     : tabsError || (query ? `没有匹配「${query}」的标签页` : "当前窗口没有可列出的标签页")
@@ -512,7 +574,11 @@ export default function PromptBar({
             )}
           </div>
           <div className="mt-1 shrink-0 border-t border-line px-2 pt-1.5 pb-1 text-[11px] text-ink-3">
-            {menu === "at" ? "输入 @ 搜索浏览器标签页" : "输入 / 搜索命令"}
+            {menu === "plus"
+              ? "选择要添加的功能"
+              : menu === "at"
+                ? "输入 @ 搜索浏览器标签页"
+                : "输入 / 搜索命令"}
           </div>
         </div>
       )}
@@ -567,6 +633,24 @@ export default function PromptBar({
                 </button>
               </span>
             ))}
+          </div>
+        )}
+
+        {selectedCommand && (
+          <div className={`flex items-center gap-2 pt-0.5 ${pill ? "px-1" : "px-0.5"}`}>
+            <Badge variant="default" className="h-7 max-w-full gap-1.5 rounded-md pr-1 pl-2 shadow-hairline">
+              <IconCommand size={13} />
+              <span className="max-w-48 truncate">/{selectedCommand.key}</span>
+              <span className="max-w-32 truncate text-ink-3">{selectedCommand.name}</span>
+              <button
+                type="button"
+                aria-label={`移除命令 ${selectedCommand.name}`}
+                onClick={() => setSelectedCommand(null)}
+                className="grid size-5 place-items-center rounded-sm text-ink-3 hover:bg-line/70 hover:text-ink"
+              >
+                <IconX size={11} stroke={2.5} />
+              </button>
+            </Badge>
           </div>
         )}
 

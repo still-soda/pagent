@@ -14,6 +14,8 @@ export function Composer({
   selectingElement,
   onSelectElement,
   onRemoveElement,
+  onStartTeaching,
+  placeholder,
 }: {
   settings: AgentSettings;
   onSubmit: (prompt: string, context?: string, imageDataUrl?: string) => void;
@@ -25,12 +27,14 @@ export function Composer({
   selectingElement: boolean;
   onSelectElement: () => void;
   onRemoveElement: () => void;
+  onStartTeaching: () => void;
+  placeholder?: string;
 }) {
   return (
     <div className="mt-auto shrink-0 border-t border-line bg-page p-2">
       <PromptBar
         demo={false}
-        placeholder="给当前页面下达任务…"
+        placeholder={placeholder ?? "给当前页面下达任务…"}
         onSend={onSubmit}
         imageDataUrl={imageDataUrl}
         onMarkScreen={onMarkScreen}
@@ -39,6 +43,7 @@ export function Composer({
         selectingElement={selectingElement}
         onSelectElement={onSelectElement}
         onRemoveElement={onRemoveElement}
+        onStartTeaching={onStartTeaching}
         modelKey={settings.model.model}
         models={modelsForProvider(settings.model.provider).map((item) => ({
           key: item.id,

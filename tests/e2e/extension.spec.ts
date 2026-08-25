@@ -116,12 +116,65 @@ test('loads the in-page agent on a static page', async ({ baseURL }) => {
       expect(box!.width).toBeGreaterThanOrEqual(36);
       expect(box!.height).toBeGreaterThanOrEqual(20);
     }
-    await page.getByLabel('关闭').click();
+    await page.getByLabel('关闭', { exact: true }).click();
     await expect(page.getByLabel('打开 Pagent')).toBeVisible();
     await expect(page.getByLabel('Prompt')).not.toBeVisible();
     await page.locator('input[name="name"]').fill('Pagent');
     await page.locator('#hello').click();
     await expect(page.locator('#out')).toHaveText('你好，Pagent');
+  } finally {
+    await context.close();
+    fs.rmSync(userDataDir, { recursive: true, force: true });
+  }
+});
+
+test('records a teaching flow across reload and saves a vault command', async ({ baseURL }) => {
+  test.skip(!baseURL, '需要本地 fixture 服务');
+  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pagent-teaching-e2e-'));
+  const context = await chromium.launchPersistentContext(userDataDir, {
+    headless: false,
+    args: [
+      `--disable-extensions-except=${extensionPath}`,
+      `--load-extension=${extensionPath}`,
+    ],
+  });
+
+  try {
+    context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker', { timeout: 15_000 }));
+    const page = await context.newPage();
+    await page.goto(`${baseURL}/static.html`);
+    await expect(page.locator('pagent-root')).toBeAttached({ timeout: 15_000 });
+    await page.getByLabel('打开 Pagent').click();
+    await page.getByLabel('添加内容').click();
+    await page.getByText('开始示教', { exact: true }).click();
+
+    const orb = page.getByLabel('打开示教控制');
+    await expect(orb).toBeVisible();
+    await page.locator('input[name="name"]').fill('示教用户');
+    await page.locator('#hello').click();
+    await page.reload();
+    await expect(page.getByLabel('打开示教控制')).toBeVisible({ timeout: 15_000 });
+
+    await page.getByLabel('打开示教控制').click();
+    await page.getByText('结束并总结', { exact: true }).click();
+    await expect(page.getByLabel('示教流程确认')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/条记录/)).toBeVisible();
+
+    const prompt = page.getByLabel('Prompt');
+    await prompt.fill('把流程名称改得更简短');
+    await prompt.press('Enter');
+    await expect(page.getByText(/已调整/)).toBeVisible({ timeout: 15_000 });
+    await page.getByText('确认并固化', { exact: true }).click();
+    const savedAlert = page.getByText(/已固化到当前网站 Vault/);
+    await expect(savedAlert).toBeVisible();
+    await expect(savedAlert).not.toBeVisible({ timeout: 7_000 });
+
+    await prompt.fill('/');
+    const commandRow = page.getByText('操作流程', { exact: false }).first();
+    await expect(commandRow).toBeVisible();
+    await commandRow.click();
+    await expect(prompt).toHaveValue('');
+    await expect(page.getByLabel(/移除命令/)).toBeVisible();
   } finally {
     await context.close();
     fs.rmSync(userDataDir, { recursive: true, force: true });

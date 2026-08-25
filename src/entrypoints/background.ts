@@ -9,18 +9,54 @@ import { running, stopAgentForTab } from '@/features/agent/background/agent-cont
 import { handleRpc } from '@/features/agent/background/rpc-router';
 import { recoverInterruptedSessions } from '@/features/agent/background/session-recovery';
 import { togglePanel } from '@/features/agent/background/content-bridge';
+import { recordBrowserAction } from '@/features/teaching/background/teaching-controller';
 
 export default defineBackground(() => {
   installServiceWorkerKeepAlive();
   void migrateLegacyPageStores().catch(() => {});
   void recoverInterruptedSessions().catch(() => {});
 
-  browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
-    if (!changeInfo.url) return;
-    void archiveTabNavigation(tabId, changeInfo.url).catch(() => {});
+  browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.url) {
+      void archiveTabNavigation(tabId, changeInfo.url).catch(() => {});
+      void recordBrowserAction(
+        'navigate',
+        tabId,
+        { url: changeInfo.url, title: tab.title },
+        '页面跳转',
+      ).catch(() => {});
+      return;
+    }
+    if (changeInfo.status === 'loading' && tab.url) {
+      void recordBrowserAction('reload', tabId, { url: tab.url, title: tab.title }, '页面加载或刷新')
+        .catch(() => {});
+    }
+  });
+
+  browser.tabs.onActivated.addListener((activeInfo) => {
+    void browser.tabs.get(activeInfo.tabId).then((tab) => {
+      if (!tab.url) return;
+      return recordBrowserAction(
+        'tab_switch',
+        activeInfo.tabId,
+        { url: tab.url, title: tab.title },
+        '切换标签页',
+      );
+    }).catch(() => {});
+  });
+
+  browser.tabs.onCreated.addListener((tab) => {
+    if (!tab.id) return;
+    void recordBrowserAction(
+      'tab_open',
+      tab.id,
+      { url: tab.url ?? 'about:blank', title: tab.title },
+      '打开标签页',
+    ).catch(() => {});
   });
 
   browser.tabs.onRemoved.addListener((tabId) => {
+    void recordBrowserAction('tab_close', tabId, { url: '', title: '' }, '关闭标签页').catch(() => {});
     stopAgentForTab(tabId);
     clearTabStoreState(tabId);
     running.delete(tabId);

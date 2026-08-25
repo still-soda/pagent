@@ -11,6 +11,9 @@ import { HistoryDrawer } from './HistoryDrawer';
 import { PageContext } from './PageContext';
 import { AssistantMessage, hasAssistantOutput } from './AssistantMessage';
 import { Composer } from './Composer';
+import { FlowConfirmCard } from '@/features/teaching/ui/FlowConfirmCard';
+import { CommandSavedAlert } from '@/features/teaching/ui/CommandSavedAlert';
+import type { SavedCommand, TeachingSession } from '@/shared/contracts/teaching';
 
 export function AgentPanel({
   settings,
@@ -42,6 +45,12 @@ export function AgentPanel({
   selectingElement,
   onSelectElement,
   onRemoveElement,
+  teachingSession,
+  teachingBusy,
+  confirmedCommand,
+  onStartTeaching,
+  onCancelTeaching,
+  onConfirmTeaching,
 }: {
   settings: AgentSettings;
   messages: ChatMessage[];
@@ -72,6 +81,12 @@ export function AgentPanel({
   selectingElement: boolean;
   onSelectElement: () => void;
   onRemoveElement: () => void;
+  teachingSession?: TeachingSession | null;
+  teachingBusy?: boolean;
+  confirmedCommand?: SavedCommand | null;
+  onStartTeaching: () => void;
+  onCancelTeaching: () => void;
+  onConfirmTeaching: () => void;
 }) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const lastUserId = [...messages].reverse().find((message) => message.role === 'user')?.id;
@@ -147,6 +162,17 @@ export function AgentPanel({
                   />
                 ),
               )}
+              {teachingSession && ['summarizing', 'reviewing'].includes(teachingSession.status) && (
+                <FlowConfirmCard
+                  session={teachingSession}
+                  busy={Boolean(teachingBusy)}
+                  onConfirm={onConfirmTeaching}
+                  onDiscard={onCancelTeaching}
+                />
+              )}
+              {confirmedCommand && (
+                <CommandSavedAlert command={confirmedCommand} />
+              )}
               {running && !hasAssistantOutput(messages.at(-1)) && (
                 <LoadingState label={thinking || '正在思考…'} variant="Dots" />
               )}
@@ -171,6 +197,8 @@ export function AgentPanel({
             selectingElement={selectingElement}
             onSelectElement={onSelectElement}
             onRemoveElement={onRemoveElement}
+            onStartTeaching={onStartTeaching}
+            placeholder={teachingSession?.status === 'reviewing' ? '告诉我如何调整这份流程总结…' : undefined}
           />
         )}
       </div>

@@ -24,6 +24,8 @@ import {
 } from '@/shared/extension/panel-position';
 import { applyShadowTheme } from '@/shared/extension/theme';
 import { AgentPanel } from './AgentPanel';
+import { TeachingOrb } from '@/features/teaching/ui/TeachingOrb';
+import { useTeachingSession } from '@/features/teaching/ui/useTeachingSession';
 
 export function AgentApp({
   open,
@@ -33,8 +35,11 @@ export function AgentApp({
   onOpenChange: (open: boolean) => void;
 }) {
   const session = useAgentSession();
+  const teaching = useTeachingSession(session.page.url, session.activeId);
   const rootRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const fabRef = useRef<HTMLButtonElement>(null);
+  const fabFrameRef = useRef<number | undefined>(undefined);
   const dragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
   const resizeRef = useRef<{
     edge: PanelResizeEdge;
@@ -87,6 +92,48 @@ export function AgentApp({
   useLayoutEffect(() => {
     if (session.agentActive && !session.workingOnThisPage) onOpenChange(false);
   }, [session.agentActive, session.workingOnThisPage, onOpenChange]);
+
+  useEffect(() => {
+    const fab = fabRef.current;
+    if (open || session.agentActive) {
+      fab?.style.setProperty('--fab-look-x', '0');
+      fab?.style.setProperty('--fab-look-y', '0');
+      return;
+    }
+    const onMove = (event: PointerEvent) => {
+      if (fabFrameRef.current) cancelAnimationFrame(fabFrameRef.current);
+      fabFrameRef.current = requestAnimationFrame(() => {
+        const currentFab = fabRef.current;
+        if (!currentFab) return;
+        const rect = currentFab.getBoundingClientRect();
+        const dx = event.clientX - (rect.left + rect.width / 2);
+        const dy = event.clientY - (rect.top + rect.height / 2);
+        const distance = Math.max(1, Math.hypot(dx, dy));
+        const isNearby = distance <= 280;
+        const strength = Math.min(1, distance / 72);
+        currentFab.style.setProperty(
+          '--fab-look-x',
+          isNearby ? ((dx / distance) * strength).toFixed(3) : '0',
+        );
+        currentFab.style.setProperty(
+          '--fab-look-y',
+          isNearby ? ((dy / distance) * strength).toFixed(3) : '0',
+        );
+      });
+    };
+    window.addEventListener('pointermove', onMove, { passive: true });
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      if (fabFrameRef.current) cancelAnimationFrame(fabFrameRef.current);
+    };
+  }, [open, session.agentActive]);
+
+  useLayoutEffect(() => {
+    if (teaching.session?.status === 'recording') onOpenChange(false);
+    if (teaching.session && ['summarizing', 'reviewing'].includes(teaching.session.status)) {
+      onOpenChange(true);
+    }
+  }, [teaching.session?.status, onOpenChange]);
 
   useLayoutEffect(() => {
     const clampToViewport = () => {
@@ -274,7 +321,11 @@ export function AgentApp({
               onSubmit={(prompt, context, attachedImage) => {
                 setImageDataUrl(undefined);
                 setSelectedElement(undefined);
-                void session.send(prompt, context, attachedImage);
+                if (teaching.session?.status === 'reviewing') {
+                  void teaching.revise(prompt);
+                } else {
+                  void session.send(prompt, context, attachedImage);
+                }
               }}
               onStop={() => void session.stop()}
               onClear={session.clear}
@@ -288,13 +339,20 @@ export function AgentApp({
               selectingElement={selectingElement}
               onSelectElement={() => setSelectingElement(true)}
               onRemoveElement={() => setSelectedElement(undefined)}
+              teachingSession={teaching.session}
+              teachingBusy={teaching.busy}
+              confirmedCommand={teaching.confirmed}
+              onStartTeaching={() => void teaching.start()}
+              onCancelTeaching={() => void teaching.cancel()}
+              onConfirmTeaching={() => void teaching.confirm()}
             />
           </div>
           <button
+            ref={fabRef}
             type="button"
             className={`pagent-fab ${
               session.agentActive ? 'is-working' : ''
-            }`}
+            } ${!session.agentActive ? 'is-idle' : ''}`}
             onClick={() => onOpenChange(true)}
             tabIndex={open ? -1 : 0}
             aria-hidden={open}
@@ -302,16 +360,24 @@ export function AgentApp({
           >
             {session.agentActive ? <span className="pagent-fab-halo" aria-hidden /> : null}
             <span className="pagent-fab-face">
-              <svg className="pagent-fab-icon" viewBox="0 0 24 24" aria-hidden>
-                <path
-                  fill="currentColor"
-                  d="M11.05 2.3a1 1 0 0 1 1.9 0l.62 1.89a9.4 9.4 0 0 0 5.94 5.94l1.89.62a1 1 0 0 1 0 1.9l-1.89.62a9.4 9.4 0 0 0-5.94 5.94l-.62 1.89a1 1 0 0 1-1.9 0l-.62-1.89a9.4 9.4 0 0 0-5.94-5.94l-1.89-.62a1 1 0 0 1 0-1.9l1.89-.62a9.4 9.4 0 0 0 5.94-5.94l.62-1.89Z"
-                />
-              </svg>
+              <span className="pagent-fab-eyes" aria-hidden>
+                <span className="pagent-fab-eye" />
+                <span className="pagent-fab-eye" />
+              </span>
             </span>
           </button>
         </div>
       </div>
+      {teaching.session && ['recording', 'summarizing'].includes(teaching.session.status) && (
+        <TeachingOrb
+          summarizing={teaching.session.status === 'summarizing'}
+          onFinish={() => {
+            onOpenChange(true);
+            void teaching.finish();
+          }}
+          onCancel={() => void teaching.cancel()}
+        />
+      )}
       {annotationSource && (
         <ScreenAnnotator
           source={annotationSource}
