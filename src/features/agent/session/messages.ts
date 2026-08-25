@@ -120,12 +120,31 @@ export function applyAssistantFinalText(messages: ChatMessage[], text: string, i
     return [...messages, appendAssistantToken({ id, role: 'assistant', content: '' }, text)];
   }
   const parts = [...messageParts(last)];
+  const currentText = parts
+    .filter((part): part is Extract<AssistantPart, { type: 'text' }> => part.type === 'text')
+    .map((part) => part.text)
+    .join('');
+  if (currentText === text || (currentText.startsWith(text) && currentText.length > text.length)) {
+    return messages;
+  }
   let textIndex = -1;
   for (let index = parts.length - 1; index >= 0; index -= 1) {
     if (parts[index]?.type === 'text') {
       textIndex = index;
       break;
     }
+  }
+  if (text.startsWith(currentText)) {
+    const suffix = text.slice(currentText.length);
+    if (!suffix) return messages;
+    if (textIndex < 0) parts.push({ type: 'text', text: suffix });
+    else {
+      const current = (parts[textIndex] as Extract<AssistantPart, { type: 'text' }>).text;
+      parts[textIndex] = { type: 'text', text: current + suffix };
+    }
+    return messages.map((item, index) =>
+      index === messages.length - 1 ? syncDerived(item, parts) : item,
+    );
   }
   if (textIndex < 0) {
     parts.push({ type: 'text', text });

@@ -171,6 +171,7 @@ export async function runAgent(options: {
           continue;
         }
         if (event.type === 'tool-start') {
+          assistant = '';
           reasoning = '';
           const existing = tasks.find((item) => item.id === event.id);
           const argsDetail =

@@ -58,6 +58,39 @@ describe('assistant message parts', () => {
     expect(assistant.content).toBe('先观察页面。接下来点击登录。');
   });
 
+  it('does not repeat earlier text blocks when the final snapshot contains the whole reply', () => {
+    let messages: ChatMessage[] = [];
+    messages = applyAssistantToken(messages, '先观察页面。', 'm1');
+    messages = applyAssistantToolStart(
+      messages,
+      { id: 't1', name: 'observe_page', args: {}, status: 'running' },
+      'm1',
+    );
+    messages = applyAssistantToolResult(messages, 't1', 'done', '标题：首页');
+    messages = applyAssistantToken(messages, '已经完成。', 'm1');
+
+    messages = applyAssistantFinalText(messages, '先观察页面。已经完成。', 'm1');
+
+    expect(messages[0]?.content).toBe('先观察页面。已经完成。');
+    expect(messageBlocks(messages[0]!)).toEqual([
+      { type: 'text', text: '先观察页面。' },
+      {
+        type: 'tools',
+        tools: [
+          {
+            type: 'tool',
+            id: 't1',
+            name: 'observe_page',
+            args: {},
+            status: 'done',
+            output: '标题：首页',
+          },
+        ],
+      },
+      { type: 'text', text: '已经完成。' },
+    ]);
+  });
+
   it('groups consecutive tools and still places later text after them', () => {
     let messages: ChatMessage[] = [];
     messages = applyAssistantToolStart(
