@@ -14,6 +14,7 @@ import { AssistantMessage, hasAssistantOutput } from './AssistantMessage';
 import { Composer } from './Composer';
 import { FlowConfirmCard } from '@/features/teaching/ui/FlowConfirmCard';
 import { CommandSavedAlert } from '@/features/teaching/ui/CommandSavedAlert';
+import { isRecentConversation } from '@/features/agent/session/conversations';
 import type { SavedCommand, TeachingSession } from '@/shared/contracts/teaching';
 
 export function AgentPanel({
@@ -98,6 +99,11 @@ export function AgentPanel({
   const activeTitle =
     conversations.find((item) => item.id === activeConversationId)?.title ?? '会话';
 
+  // 标签页只展示最近 3h 内活跃的会话 + 当前会话；其余保留在历史抽屉中
+  const tabs = conversations.filter(
+    (item) => isRecentConversation(item) || item.id === activeConversationId,
+  );
+
   const handleCloseTab = (id: string) => {
     const target = conversations.find((item) => item.id === id);
     if (target?.running) onStop();
@@ -119,7 +125,7 @@ export function AgentPanel({
       />
 
       <TabStrip
-        conversations={conversations}
+        conversations={tabs}
         activeId={activeConversationId}
         onSelect={onSelectConversation}
         onClose={handleCloseTab}

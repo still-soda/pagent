@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { rpc } from '@/shared/extension/rpc-client';
 import {
   emptyConversation,
+  isRecentConversation,
   nextConversationTitle,
   settleFinishedConversation,
   titleFromPrompt,
@@ -147,8 +148,16 @@ export function useConversationActions(options: {
       bumpRevision();
       setActiveId(id);
       setView('chat');
+      // 从历史中打开的旧会话也视为"打开"的标签页：触碰 updatedAt 使其进入最近窗口
+      setConversations((current) =>
+        current.some((item) => item.id === id && isRecentConversation(item))
+          ? current
+          : current.map((item) =>
+              item.id === id ? { ...item, updatedAt: Date.now() } : item,
+            ),
+      );
     },
-    [bumpRevision, setActiveId, setView],
+    [bumpRevision, setActiveId, setConversations, setView],
   );
 
   const closeConversation = useCallback(

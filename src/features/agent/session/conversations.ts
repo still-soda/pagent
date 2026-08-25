@@ -15,6 +15,17 @@ export function conversationTabKey(tabId: number): string {
   return `tab:${tabId}`;
 }
 
+/** 会话标签页默认保留最近活跃的时间窗口 */
+export const RECENT_TAB_WINDOW_MS = 3 * 60 * 60 * 1000;
+
+/** 会话是否在最近活跃窗口内（用于决定是否作为标签页展示） */
+export function isRecentConversation(
+  item: { updatedAt?: number },
+  now = Date.now(),
+): boolean {
+  return (item.updatedAt ?? 0) > now - RECENT_TAB_WINDOW_MS;
+}
+
 export function isSparseConversation(item: PageConversation | null | undefined): boolean {
   if (!item) return true;
   return item.messages.length === 0 && !item.running && !item.thinking && !item.error;

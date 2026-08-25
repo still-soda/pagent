@@ -4,6 +4,7 @@ import {
   conversationPageKey,
   conversationTabKey,
   emptyConversation,
+  isRecentConversation,
   isSparseStore,
   mergeConversationStores,
   pickConversationStore,
@@ -13,6 +14,7 @@ import {
   restoreConversationStore,
   settleFinishedConversation,
   titleFromPrompt,
+  RECENT_TAB_WINDOW_MS,
 } from '@/features/agent/session/conversations';
 
 describe('page conversations', () => {
@@ -24,6 +26,14 @@ describe('page conversations', () => {
 
   it('keys live sessions by tab so in-tab navigation keeps the chat', () => {
     expect(conversationTabKey(42)).toBe('tab:42');
+  });
+
+  it('treats conversations active within the 3h window as recent tabs', () => {
+    const now = 1_800_000_000_000;
+    expect(isRecentConversation({ updatedAt: now - RECENT_TAB_WINDOW_MS + 1 }, now)).toBe(true);
+    expect(isRecentConversation({ updatedAt: now - RECENT_TAB_WINDOW_MS }, now)).toBe(false);
+    expect(isRecentConversation({ updatedAt: now }, now)).toBe(true);
+    expect(isRecentConversation({ updatedAt: undefined }, now)).toBe(false);
   });
 
   it('merges two non-empty stores by conversation id', () => {
