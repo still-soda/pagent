@@ -192,7 +192,13 @@ export function hasTurnUsage(usage?: TurnUsage): boolean {
 }
 
 export function formatTokenCount(value: number): string {
-  return Math.round(value).toLocaleString('zh-CN');
+  const rounded = Math.max(0, Math.round(value));
+  if (rounded < 1_000) return rounded.toLocaleString('zh-CN');
+  const divisor = rounded >= 1_000_000 ? 1_000_000 : 1_000;
+  const suffix = divisor === 1_000_000 ? 'M' : 'K';
+  const scaled = rounded / divisor;
+  const digits = scaled < 10 ? 2 : scaled < 100 ? 1 : 0;
+  return `${Number(scaled.toFixed(digits))}${suffix}`;
 }
 
 export function formatDuration(ms: number): string {
