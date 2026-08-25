@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Pagent Fixture</title>
+  </head>
+  <body>
+    <h1>示例页面</h1>
+    <p>这是一个用于扩展验收的静态页。</p>
+    <form>
+      <label>
+        名称
+        <input name="name" placeholder="输入名称" />
+      </label>
+      <button type="button" id="hello">打招呼</button>
+    </form>
+    <div id="out"></div>
+    <script>
+      document.getElementById('hello').addEventListener('click', () => {
+        const name = document.querySelector('input[name="name"]').value || '世界';
+        document.getElementById('out').textContent = `你好，${name}`;
+      });
+    </script>
+  </body>
+</html>
