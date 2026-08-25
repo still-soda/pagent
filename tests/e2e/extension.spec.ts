@@ -116,7 +116,7 @@ test('loads the in-page agent on a static page', async ({ baseURL }) => {
       expect(box!.width).toBeGreaterThanOrEqual(36);
       expect(box!.height).toBeGreaterThanOrEqual(20);
     }
-    await page.getByLabel('关闭', { exact: true }).click();
+    await page.getByLabel('最小化', { exact: true }).click();
     await expect(page.getByLabel('打开 Pagent')).toBeVisible();
     await expect(page.getByLabel('Prompt')).not.toBeVisible();
     await page.locator('input[name="name"]').fill('Pagent');

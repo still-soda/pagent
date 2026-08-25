@@ -3,22 +3,18 @@ import type { PointerEvent } from 'react';
 export function PanelHeader({
   activeTitle,
   workingOnThisPage,
-  running,
   view,
   onClear,
   onViewChange,
-  onStop,
-  onClose,
+  onMinimize,
   onHeaderPointerDown,
 }: {
   activeTitle: string;
   workingOnThisPage: boolean;
-  running: boolean;
   view: 'chat' | 'settings';
   onClear: () => void;
   onViewChange: (view: 'chat' | 'settings') => void;
-  onStop: () => void;
-  onClose: () => void;
+  onMinimize: () => void;
   onHeaderPointerDown?: (event: PointerEvent<HTMLDivElement>) => void;
 }) {
   return (
@@ -59,9 +55,9 @@ export function PanelHeader({
             ),
           },
           {
-            label: running ? '停止' : '关闭',
-            onClick: running ? onStop : onClose,
-            path: running ? <path d="M6 6h12v12H6z" /> : <path d="M18 6L6 18M6 6l12 12" />,
+            label: '最小化',
+            onClick: onMinimize,
+            path: <path d="M5 12h14" />,
           },
         ].map((action) => (
           <button

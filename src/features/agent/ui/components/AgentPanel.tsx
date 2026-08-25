@@ -121,12 +121,10 @@ export function AgentPanel({
       <PanelHeader
         activeTitle={activeTitle}
         workingOnThisPage={workingOnThisPage}
-        running={running}
         view={view}
         onClear={onClear}
         onViewChange={onViewChange}
-        onStop={onStop}
-        onClose={onClose}
+        onMinimize={onClose}
         onHeaderPointerDown={onHeaderPointerDown}
       />
 
@@ -214,7 +212,9 @@ export function AgentPanel({
         {view === 'chat' && (
           <Composer
             settings={settings}
+            running={running}
             onSubmit={onSubmit}
+            onStop={onStop}
             onSettingsChange={onSettingsChange}
             imageDataUrl={imageDataUrl}
             onMarkScreen={onMarkScreen}

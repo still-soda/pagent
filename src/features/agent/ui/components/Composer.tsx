@@ -5,7 +5,9 @@ import type { ObservedElement } from '@/shared/contracts/page';
 
 export function Composer({
   settings,
+  running,
   onSubmit,
+  onStop,
   onSettingsChange,
   imageDataUrl,
   onMarkScreen,
@@ -18,7 +20,9 @@ export function Composer({
   placeholder,
 }: {
   settings: AgentSettings;
+  running: boolean;
   onSubmit: (prompt: string, context?: string, imageDataUrl?: string) => void;
+  onStop: () => void;
   onSettingsChange: (settings: AgentSettings) => void;
   imageDataUrl?: string;
   onMarkScreen: () => void;
@@ -35,7 +39,9 @@ export function Composer({
       <PromptBar
         demo={false}
         placeholder={placeholder ?? "给当前页面下达任务…"}
+        running={running}
         onSend={onSubmit}
+        onStop={onStop}
         imageDataUrl={imageDataUrl}
         onMarkScreen={onMarkScreen}
         onRemoveImage={onRemoveImage}

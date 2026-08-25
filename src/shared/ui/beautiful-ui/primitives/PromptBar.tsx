@@ -11,6 +11,7 @@ import {
   IconPlayerRecord,
   IconPointer,
   IconScreenshot,
+  IconSquareFilled,
   IconX,
 } from '@tabler/icons-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
@@ -103,6 +104,8 @@ export default function PromptBar({
   tall = false,
   placeholder,
   onSend,
+  running = false,
+  onStop,
   models = [],
   modelKey,
   onModelChange,
@@ -122,6 +125,9 @@ export default function PromptBar({
   tall?: boolean;
   placeholder?: string;
   onSend?: (text: string, context?: string, imageDataUrl?: string) => void;
+  /** while running the send control becomes a stop button */
+  running?: boolean;
+  onStop?: () => void;
   models?: PromptModel[];
   modelKey?: string;
   onModelChange?: (key: string) => void;
@@ -794,21 +800,23 @@ export default function PromptBar({
             )}
           </div>
 
-          {/* send — tactile square (round in the pill variant) */}
+          {/* send — tactile square (round in the pill variant); while the
+              agent is running the same control becomes a stop button */}
           <button
             type="button"
-            aria-label={preparing ? "正在读取附加页面" : "Send"}
-            disabled={!canSend}
-            onClick={send}
+            aria-label={running ? "停止" : preparing ? "正在读取附加页面" : "Send"}
+            title={running ? "停止" : undefined}
+            disabled={running ? false : !canSend}
+            onClick={running ? onStop : send}
             className={`flex size-7 shrink-0 items-center justify-center transition-[background-color,color,transform] duration-200 enabled:active:scale-[0.94] ${
               pill ? "rounded-full" : "rounded-[8px]"
             } ${wide ? "col-start-4 row-start-2" : "col-start-4 row-start-1"}`}
             style={{
-              background: canSend ? "var(--primary)" : "var(--line-strong)",
-              color: canSend ? "var(--primary-foreground)" : "var(--ink-2)",
+              background: running ? "var(--red)" : canSend ? "var(--primary)" : "var(--line-strong)",
+              color: running ? "#fff" : canSend ? "var(--primary-foreground)" : "var(--ink-2)",
             }}
           >
-            <IconArrowUp size={17} stroke={2.4} />
+            {running ? <IconSquareFilled size={13} /> : <IconArrowUp size={17} stroke={2.4} />}
           </button>
         </div>
       </div>
