@@ -3,6 +3,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import {
+  IconBrowser,
+  IconClock,
+  IconCode,
+  IconEye,
+  IconFileText,
+  IconKeyboard,
+  IconNetwork,
+  IconPencil,
+  IconPointer,
+  IconSearch,
+  IconSparkles,
+  IconTerminal2,
+  IconWorld,
+  type TablerIcon,
+} from "@tabler/icons-react";
 
 /* ─────────────────────────────────────────────────────────
  * TOOL CHIPS
@@ -18,20 +34,20 @@ const OPEN_DELAY_MS = 180;
 /** Keep the last frame up so a follow-up call or the reply body can take over without collapsing. */
 const CLOSE_DELAY_MS = 480;
 
-const Icons: Record<string, React.ReactNode> = {
-  think: <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z" />,
-  write: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z" /></g>,
-  run: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 17l6-5-6-5M12 19h8" /></g>,
-  observe: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></g>,
-  search: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></g>,
-  click: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3v11l3.2-2.1L15 17l2-1-2.8-5H19z" /></g>,
-  type: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2" /><path d="M6 10h.01M10 10h.01M14 10h.01M8 14h8" /></g>,
-  navigate: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></g>,
-  tab: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="14" rx="2" /><path d="M3 9h18" /></g>,
-  wait: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="8" /><path d="M12 8v4l2.5 1.5" /></g>,
-  read: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></g>,
-  script: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 8l-3 4 3 4M16 8l3 4-3 4" /></g>,
-  network: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12a7 7 0 0 1 14 0M8.5 15.5a4 4 0 0 1 7 0" /><circle cx="12" cy="19" r="1" /></g>,
+const Icons: Record<string, TablerIcon> = {
+  think: IconSparkles,
+  write: IconPencil,
+  run: IconTerminal2,
+  observe: IconEye,
+  search: IconSearch,
+  click: IconPointer,
+  type: IconKeyboard,
+  navigate: IconWorld,
+  tab: IconBrowser,
+  wait: IconClock,
+  read: IconFileText,
+  script: IconCode,
+  network: IconNetwork,
 };
 
 type DetailLine = { text: string; tone?: "add" };
@@ -188,7 +204,7 @@ export default function ToolChips({
   })();
 
   return (
-    <div ref={rootRef} className={`${calls ? "min-h-0 w-full" : "min-h-[220px] w-full max-w-80"} pb-1`}>
+    <div ref={rootRef} className={calls ? "mb-0 min-h-0 w-full" : "min-h-[220px] w-full max-w-80 pb-1"}>
       {/* collapsed run header */}
       <button
         type="button"
@@ -222,6 +238,7 @@ export default function ToolChips({
             : ROWS.map((row, index) => ({ ...row, key: `${row.label}-${index}` }))
           ).slice(0, calls ? calls.length : step).map((row) => {
             const rowOpen = openRows.has(row.key);
+            const ToolIcon = Icons[row.icon] ?? Icons.observe;
             return (
             <div
               key={row.key}
@@ -238,12 +255,12 @@ export default function ToolChips({
                     row.status === "error" ? "text-red" : row.status === "running" ? "text-accent" : "text-ink-3"
                   }`}
                 >
-                  <svg
-                    width="13" height="13" viewBox="0 0 24 24" fill={row.icon === "think" ? "currentColor" : "none"} stroke="currentColor"
+                  <ToolIcon
+                    size={13}
+                    stroke={2}
+                    aria-hidden
                     className={`transition-opacity duration-100 group-hover/row:opacity-0 ${rowOpen ? "opacity-0" : ""}`}
-                  >
-                    {Icons[row.icon] ?? Icons.observe}
-                  </svg>
+                  />
                   <svg
                     width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
                     className={`absolute transition-[opacity,transform] duration-150 group-hover/row:opacity-100 ${rowOpen ? "opacity-100" : "opacity-0"}`}
