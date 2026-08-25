@@ -315,6 +315,11 @@
   display: none;
 }
 
+.pagent-window ::selection {
+  color: var(--ink);
+  background: color-mix(in oklch, var(--accent) 18%, transparent);
+}
+
 .pagent-led {
   display: inline-block;
   width: 7px;
