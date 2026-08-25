@@ -386,7 +386,12 @@ export function AgentApp({
             aria-hidden={open}
             aria-label={session.agentActive ? '打开 Pagent，Agent Active' : '打开 Pagent'}
           >
-            {session.agentActive ? <span className="pagent-fab-halo" aria-hidden /> : null}
+            {session.agentActive ? (
+              <>
+                <span className="pagent-fab-halo" aria-hidden />
+                <span className="pagent-fab-pulse" aria-hidden />
+              </>
+            ) : null}
             <span className="pagent-fab-face">
               <span className="pagent-fab-eyes" aria-hidden>
                 <span className="pagent-fab-eye" />

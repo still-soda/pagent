@@ -272,6 +272,10 @@
     animation: none;
     background: conic-gradient(from 90deg, transparent 0 62%, var(--accent) 100%);
   }
+  .pagent-fab-pulse {
+    animation: none;
+    opacity: 0.4;
+  }
 }
 
 :host(.dark) .pagent-window,
@@ -540,6 +544,25 @@
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
   mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
   pointer-events: none;
+}
+
+/* working pulse — mirrors the teaching orb's work animation: a ring
+   radiating from the center of the FAB and fading out */
+.pagent-fab-pulse {
+  position: absolute;
+  inset: 6px;
+  z-index: 4;
+  border: 1.5px solid color-mix(in oklch, var(--accent) 68%, transparent);
+  border-radius: inherit;
+  opacity: 0;
+  animation: pagent-fab-pulse 1.8s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes pagent-fab-pulse {
+  0% { opacity: 0.85; transform: scale(0.5); }
+  70% { opacity: 0.3; }
+  100% { opacity: 0; transform: scale(1.2); }
 }
 
 .pagent-fab.is-working .pagent-fab-face {
