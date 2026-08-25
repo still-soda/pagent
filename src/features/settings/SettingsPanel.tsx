@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Label } from '@/shared/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { Switch } from '@/shared/ui/switch';
+import { Textarea } from '@/shared/ui/textarea';
 import { rpc } from '@/shared/extension/rpc-client';
 import { requestPermissions } from '@/shared/browser/permissions';
+import { mcpConfigSchema, type McpState, type McpServerStatusKind } from '@/shared/contracts/mcp';
 import {
   DEFAULT_SETTINGS,
   PROVIDER_IDS,
@@ -30,6 +32,15 @@ async function requestOptionalPermissions(options: {
     return (await rpc('permissions.request', options)) as PermissionState;
   }
 }
+
+const MCP_STATUS_LABELS: Record<McpServerStatusKind, string> = {
+  connected: '已连接',
+  connecting: '连接中…',
+  unauthorized: '未授权',
+  error: '连接失败',
+  disabled: '已禁用',
+  disconnected: '未连接',
+};
 
 function SettingRow({
   label,
@@ -59,14 +70,64 @@ export function SettingsPanel({
   const [keys, setKeys] = useState<Record<string, boolean>>({});
   const [permissions, setPermissions] = useState<PermissionState>();
   const [status, setStatus] = useState('');
+  const [mcpJson, setMcpJson] = useState('');
+  const [mcpState, setMcpState] = useState<McpState>();
+  const [mcpError, setMcpError] = useState('');
+  const [mcpBusy, setMcpBusy] = useState(false);
+  const [mcpOpen, setMcpOpen] = useState(false);
+  const mcpJsonReady = useRef(false);
 
   const refresh = async () => {
-    const [has, perms] = await Promise.all([
+    const [has, perms, mcp] = await Promise.all([
       rpc('secrets.has', {}) as Promise<Record<string, boolean>>,
       rpc('permissions.get', {}) as Promise<PermissionState>,
+      rpc('mcp.getState', {}) as Promise<McpState>,
     ]);
     setKeys(has);
     setPermissions(perms);
+    setMcpState(mcp);
+    if (!mcpJsonReady.current) {
+      mcpJsonReady.current = true;
+      setMcpJson(JSON.stringify(mcp.config, null, 2));
+    }
+  };
+
+  const saveMcp = async () => {
+    setMcpBusy(true);
+    setMcpError('');
+    try {
+      let raw: unknown;
+      try {
+        raw = JSON.parse(mcpJson);
+      } catch {
+        throw new Error('MCP 配置不是合法的 JSON');
+      }
+      const entries = raw && typeof raw === 'object' ? (raw as Record<string, unknown>).mcpServers : undefined;
+      if (!entries || typeof entries !== 'object') {
+        throw new Error('配置缺少 mcpServers 对象，请使用 mcp-server.json 格式');
+      }
+      for (const [name, value] of Object.entries(entries as Record<string, unknown>)) {
+        const server = value as Record<string, unknown> | null;
+        if (!server || typeof server !== 'object') {
+          throw new Error(`服务器「${name}」配置不是对象`);
+        }
+        if (typeof server.command === 'string' && !server.url) {
+          throw new Error(`服务器「${name}」使用 stdio(command) 启动，浏览器扩展仅支持远程 http/ws 服务器`);
+        }
+      }
+      const parsed = mcpConfigSchema.safeParse(raw);
+      if (!parsed.success) {
+        const issue = parsed.error.issues[0];
+        throw new Error(`配置格式错误：${issue?.path.join('.') || 'mcpServers'} ${issue?.message ?? ''}`);
+      }
+      const state = (await rpc('mcp.setConfig', { config: parsed.data })) as McpState;
+      setMcpState(state);
+      setStatus('MCP 配置已保存并尝试连接');
+    } catch (error) {
+      setMcpError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setMcpBusy(false);
+    }
   };
 
   useEffect(() => {
@@ -313,6 +374,103 @@ export function SettingsPanel({
           checked={settings.allowCrossOrigin}
           onCheckedChange={(allowCrossOrigin) => void patch({ allowCrossOrigin })}
         />
+      </section>
+
+      <section className="rounded-card border border-line bg-surface">
+        <button
+          type="button"
+          aria-expanded={mcpOpen}
+          onClick={() => setMcpOpen((open) => !open)}
+          className="flex w-full items-center gap-1.5 px-3 py-2.5 text-left select-none"
+        >
+          <h3 className="flex-1 text-xs font-semibold tracking-wide text-ink-2">MCP 服务器</h3>
+          <svg
+            aria-hidden
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`text-ink-3 transition-transform duration-150 ${mcpOpen ? 'rotate-90' : ''}`}
+          >
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+        </button>
+        {mcpOpen && (
+          <div className="space-y-2.5 border-t border-line px-3 pt-2.5 pb-3">
+            <p className="text-[12.5px] leading-5 text-ink-2">
+              仅支持 http/https/ws/wss 远程服务器，不支持 stdio(command) 启动。
+            </p>
+            <Textarea
+              aria-label="MCP 配置 JSON"
+              value={mcpJson}
+              onChange={(event) => setMcpJson(event.target.value)}
+              spellCheck={false}
+              wrap="off"
+              className="min-h-40 overflow-x-auto font-mono text-[11.5px] leading-4 whitespace-pre"
+              placeholder={'{\n  "mcpServers": {\n    "example": {\n      "url": "https://example.com/mcp",\n      "headers": { "Authorization": "Bearer token" }\n    }\n  }\n}'}
+            />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => void saveMcp()} disabled={mcpBusy}>
+                {mcpBusy ? '保存中…' : '保存并连接'}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={mcpBusy}
+                onClick={async () => {
+                  setMcpBusy(true);
+                  setMcpError('');
+                  try {
+                    const state = (await rpc('mcp.sync', {})) as McpState;
+                    setMcpState(state);
+                    setStatus('已重新连接 MCP 服务器');
+                  } catch (error) {
+                    setMcpError(error instanceof Error ? error.message : String(error));
+                  } finally {
+                    setMcpBusy(false);
+                  }
+                }}
+              >
+                重新连接
+              </Button>
+            </div>
+            {mcpError && <p className="text-[12.5px] leading-5 text-red">{mcpError}</p>}
+            {mcpState && mcpState.servers.length > 0 && (
+              <ul className="space-y-1">
+                {mcpState.servers.map((server) => (
+                  <li
+                    key={server.name}
+                    className="flex items-start gap-2 rounded-[8px] bg-inset px-2 py-1.5 text-[12.5px] leading-5"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium text-ink">{server.name}</span>
+                      <span className="block truncate text-ink-3">{server.url}</span>
+                      {server.error && <span className="block truncate text-red">{server.error}</span>}
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1.5 text-ink-2">
+                      {server.toolCount > 0 && <span className="text-ink-3">{server.toolCount} 工具</span>}
+                      <span
+                        className={`rounded-chip px-1.5 py-0.5 text-[11px] ${
+                          server.status === 'connected'
+                            ? 'bg-green-tint text-green'
+                            : server.status === 'error' || server.status === 'unauthorized'
+                              ? 'bg-red-tint text-red'
+                              : 'bg-field text-ink-2'
+                        }`}
+                      >
+                        {MCP_STATUS_LABELS[server.status]}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </section>
 
       <section className="space-y-2.5 rounded-card border border-line bg-surface p-3">
