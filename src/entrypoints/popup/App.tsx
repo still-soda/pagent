@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Sparkles } from 'lucide-react';
+import { IconSparkles } from '@tabler/icons-react';
 import { Button } from '@/shared/ui/button';
 import { rpc } from '@/shared/extension/rpc-client';
 import { applyDocumentTheme, resolveThemeClass } from '@/shared/extension/theme';
@@ -26,7 +26,7 @@ export function PopupApp() {
     <div className="w-[320px] bg-page p-4 text-ink">
       <div className="mb-3 flex items-center gap-2">
         <span className="grid size-8 place-items-center rounded-2xl bg-primary text-primary-foreground">
-          <Sparkles className="size-4" />
+          <IconSparkles className="size-4" />
         </span>
         <div>
           <div className="text-sm font-semibold">Pagent</div>
