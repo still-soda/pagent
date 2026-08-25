@@ -237,6 +237,14 @@
   opacity: 1;
 }
 
+.pagent-tab-strip {
+  scrollbar-width: none;
+}
+
+.pagent-tab-strip::-webkit-scrollbar {
+  display: none;
+}
+
 .pagent-mention-menu {
   display: flex;
   min-height: 0;

@@ -7,6 +7,7 @@ import type { ChatMessage, TaskRow } from '@/shared/contracts/session-messages';
 import type { AgentSettings } from '@/shared/contracts/settings';
 import type { ObservedElement } from '@/shared/contracts/page';
 import { PanelHeader } from './PanelHeader';
+import { TabStrip } from './TabStrip';
 import { HistoryDrawer } from './HistoryDrawer';
 import { PageContext } from './PageContext';
 import { AssistantMessage, hasAssistantOutput } from './AssistantMessage';
@@ -60,7 +61,7 @@ export function AgentPanel({
   thinking: string;
   error: string;
   page: { url: string; title: string; selection: string };
-  conversations: Array<{ id: string; title: string; updatedAt?: number }>;
+  conversations: Array<{ id: string; title: string; updatedAt?: number; running?: boolean }>;
   activeConversationId: string;
   onSelectConversation: (id: string) => void;
   onCreateConversation: () => void | Promise<void>;
@@ -97,24 +98,37 @@ export function AgentPanel({
   const activeTitle =
     conversations.find((item) => item.id === activeConversationId)?.title ?? '会话';
 
+  const handleCloseTab = (id: string) => {
+    const target = conversations.find((item) => item.id === id);
+    if (target?.running) onStop();
+    onCloseConversation(id);
+  };
+
   return (
     <div className="pagent-window relative flex h-[min(680px,calc(100vh-48px))] w-full flex-col self-start">
       <PanelHeader
         activeTitle={activeTitle}
-        historyOpen={historyOpen}
         workingOnThisPage={workingOnThisPage}
         running={running}
         view={view}
-        onHistoryToggle={() => setHistoryOpen((open) => !open)}
-        onCreateConversation={() => {
-          setHistoryOpen(false);
-          return onCreateConversation();
-        }}
         onClear={onClear}
         onViewChange={onViewChange}
         onStop={onStop}
         onClose={onClose}
         onHeaderPointerDown={onHeaderPointerDown}
+      />
+
+      <TabStrip
+        conversations={conversations}
+        activeId={activeConversationId}
+        onSelect={onSelectConversation}
+        onClose={handleCloseTab}
+        onCreate={() => {
+          setHistoryOpen(false);
+          return onCreateConversation();
+        }}
+        onHistoryToggle={() => setHistoryOpen((open) => !open)}
+        historyOpen={historyOpen}
       />
 
       <HistoryDrawer
