@@ -12,7 +12,7 @@ import { attachTopLayer } from '@/shared/extension/top-layer';
 import { isTogglePanelHotkey } from '@/shared/extension/hotkey';
 import { installPageNavigationEvents, PAGE_NAVIGATION_EVENT } from '@/features/page/navigation';
 import { handleContentCommand } from '@/features/page/content-command-handler';
-import { dispatchUiCommand, uiEvents } from '@/features/page/ui-events';
+import { dispatchUiCommand, type UiCommand, uiEvents } from '@/features/page/ui-events';
 
 function persistPanelOpen(open: boolean) {
   void rpc('session.setUi', { panelOpen: open });
@@ -20,6 +20,8 @@ function persistPanelOpen(open: boolean) {
 
 function ContentShell() {
   const [open, setOpen] = useState(false);
+  const [visible, setVisible] = useState<boolean>();
+  const [permanentlyHidden, setPermanentlyHidden] = useState(false);
   const openRef = useRef(open);
   const lastToggleAt = useRef(0);
   openRef.current = open;
@@ -33,16 +35,31 @@ function ContentShell() {
     const now = Date.now();
     if (now - lastToggleAt.current < 120) return;
     lastToggleAt.current = now;
+    setVisible(true);
     setOpenAndPersist(!openRef.current);
   }, [setOpenAndPersist]);
 
   useEffect(() => {
-    void rpc('session.context', { url: location.href }).then((value) => {
-      const context = value as SessionContext;
+    void Promise.all([
+      rpc('session.context', { url: location.href }),
+      rpc('menu.getState', {}),
+    ]).then(([sessionValue, menuValue]) => {
+      const context = sessionValue as SessionContext;
+      const menu = menuValue as { permanentlyHidden?: boolean };
+      const hidden = Boolean(menu.permanentlyHidden);
+      setPermanentlyHidden(hidden);
+      setVisible(!hidden);
       if (context.panelOpen || context.running) setOpen(true);
     });
     const onToggle = () => togglePanel();
-    const onOpen = () => setOpenAndPersist(true);
+    const onOpen = () => {
+      setVisible(true);
+      setOpenAndPersist(true);
+    };
+    const onHide = () => {
+      setOpenAndPersist(false);
+      setVisible(false);
+    };
     const onKeyDown = (event: Event) => {
       if (!(event instanceof KeyboardEvent) || !isTogglePanelHotkey(event)) return;
       event.preventDefault();
@@ -50,26 +67,50 @@ function ContentShell() {
       togglePanel();
     };
     const bump = () => pageObserver.bump();
+    const onStorageChanged = (
+      changes: Record<string, Browser.storage.StorageChange>,
+      areaName: string,
+    ) => {
+      if (areaName !== 'local') return;
+      const change = changes['pagent:permanently-hidden'];
+      if (!change) return;
+      const hidden = change.newValue === true;
+      setPermanentlyHidden(hidden);
+      if (!hidden) setVisible(true);
+    };
     const shadowRoot = document.querySelector('pagent-root')?.shadowRoot;
     uiEvents.addEventListener('toggle', onToggle);
     uiEvents.addEventListener('open', onOpen);
+    uiEvents.addEventListener('hide', onHide);
     window.addEventListener('keydown', onKeyDown, true);
     shadowRoot?.addEventListener('keydown', onKeyDown, true);
     window.addEventListener('popstate', bump);
     window.addEventListener('hashchange', bump);
     window.addEventListener(PAGE_NAVIGATION_EVENT, bump);
+    browser.storage.onChanged.addListener(onStorageChanged);
     return () => {
       uiEvents.removeEventListener('toggle', onToggle);
       uiEvents.removeEventListener('open', onOpen);
+      uiEvents.removeEventListener('hide', onHide);
       window.removeEventListener('keydown', onKeyDown, true);
       shadowRoot?.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('popstate', bump);
       window.removeEventListener('hashchange', bump);
       window.removeEventListener(PAGE_NAVIGATION_EVENT, bump);
+      browser.storage.onChanged.removeListener(onStorageChanged);
     };
   }, [setOpenAndPersist, togglePanel]);
 
-  return <AgentApp open={open} onOpenChange={setOpenAndPersist} />;
+  if (!visible) return null;
+  return (
+    <AgentApp
+      open={open}
+      onOpenChange={(next) => {
+        setOpenAndPersist(next);
+        if (!next && permanentlyHidden) setVisible(false);
+      }}
+    />
+  );
 }
 
 export default defineContentScript({
@@ -88,7 +129,7 @@ export default defineContentScript({
       Promise.resolve(handleContentCommand(message.name, message.payload ?? {}))
         .then((result) => {
           if (result && typeof result === 'object' && 'uiCommand' in result) {
-            dispatchUiCommand(result.uiCommand as 'ui.toggle' | 'ui.open');
+            dispatchUiCommand(result.uiCommand as UiCommand);
             sendResponse({ ok: true, result: { ok: true } });
             return;
           }

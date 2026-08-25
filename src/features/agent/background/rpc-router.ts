@@ -62,6 +62,8 @@ import {
 import { sendToContent, snapshotMentionedTab, togglePanel } from './content-bridge';
 import { archiveTabNavigation, readTabStore, resolveTabUrl, tabDomains, tabStores, writeTabStore } from './tab-store';
 
+const PERMANENTLY_HIDDEN_KEY = 'pagent:permanently-hidden';
+
 export async function handleRpc(name: RpcName, payload: unknown, senderTabId?: number) {
   const tabId = senderTabId ?? (await getActiveTab()).id!;
   const settings = await loadSettings();
@@ -295,6 +297,22 @@ export async function handleRpc(name: RpcName, payload: unknown, senderTabId?: n
       return { ok: true };
     case 'agent.toggle':
       return togglePanel(tabId);
+    case 'menu.getState': {
+      const stored = await browser.storage.local.get(PERMANENTLY_HIDDEN_KEY);
+      return { permanentlyHidden: stored[PERMANENTLY_HIDDEN_KEY] === true };
+    }
+    case 'menu.openCurrent':
+      await sendToContent(tabId, 'ui.open', {});
+      return { ok: true };
+    case 'menu.hideCurrent':
+      await sendToContent(tabId, 'ui.hide', {});
+      return { ok: true };
+    case 'menu.setPermanentlyHidden': {
+      const { hidden } = parseRpcPayload('menu.setPermanentlyHidden', payload);
+      await browser.storage.local.set({ [PERMANENTLY_HIDDEN_KEY]: hidden });
+      await sendToContent(tabId, hidden ? 'ui.hide' : 'ui.open', {}).catch(() => {});
+      return { permanentlyHidden: hidden };
+    }
     default:
       throw new Error(`未知命令 ${name}`);
   }

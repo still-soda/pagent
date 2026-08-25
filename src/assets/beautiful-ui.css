@@ -307,6 +307,14 @@
   background-clip: padding-box;
 }
 
+.pagent-thinking-scroll {
+  scrollbar-width: none;
+}
+
+.pagent-thinking-scroll::-webkit-scrollbar {
+  display: none;
+}
+
 .pagent-led {
   display: inline-block;
   width: 7px;

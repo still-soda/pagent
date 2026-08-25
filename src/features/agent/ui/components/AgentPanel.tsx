@@ -133,7 +133,7 @@ export function AgentPanel({
         <div
           ref={scrollerRef}
           onScroll={onScroll}
-          className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] px-3 pt-2.5 pb-2"
+          className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-gutter-stable px-3 pt-2.5 pb-2"
         >
           {view === 'settings' ? (
             <SettingsPanel settings={settings} onChange={onSettingsChange} />

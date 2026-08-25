@@ -7,8 +7,7 @@ import { rpc } from '@/shared/extension/rpc-client';
 import type { ObservedElement } from '@/shared/contracts/page';
 import { pageObserver } from '@/features/page/observer';
 import {
-  retainPageSelectionOnPointerDown,
-  restoreRememberedSelection,
+  notePagentInteraction,
 } from '@/features/page/selection';
 import {
   clampPanelPosition,
@@ -183,13 +182,13 @@ export function AgentApp({
       setManipulating(false);
       persistLayout();
     };
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-    window.addEventListener('pointercancel', onUp);
+    window.addEventListener('pointermove', onMove, true);
+    window.addEventListener('pointerup', onUp, true);
+    window.addEventListener('pointercancel', onUp, true);
     return () => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-      window.removeEventListener('pointercancel', onUp);
+      window.removeEventListener('pointermove', onMove, true);
+      window.removeEventListener('pointerup', onUp, true);
+      window.removeEventListener('pointercancel', onUp, true);
     };
   }, []);
 
@@ -258,13 +257,16 @@ export function AgentApp({
   }, [captureError]);
 
   const panelHidden = capturingScreen || selectingElement;
+  const stopPanelEvent = (event: { stopPropagation: () => void }) => {
+    event.stopPropagation();
+  };
 
   return (
     <div ref={rootRef} className={`${session.themeClass} pointer-events-none`}>
       <div className="pointer-events-none fixed inset-0">
         <div
           ref={panelRef}
-          className={`pagent-morph-shell pointer-events-auto absolute ${
+          className={`pagent-morph-shell pointer-events-auto absolute select-text ${
             open ? 'is-open' : ''
           } ${manipulating ? 'is-manipulating' : ''}`}
           style={{
@@ -276,9 +278,23 @@ export function AgentApp({
             pointerEvents: panelHidden ? 'none' : undefined,
             transition: panelHidden ? 'none' : undefined,
           }}
-          onPointerDown={retainPageSelectionOnPointerDown}
-          onMouseDown={retainPageSelectionOnPointerDown}
-          onPointerUp={(event) => restoreRememberedSelection(event)}
+          onPointerDown={(event) => {
+            notePagentInteraction();
+            stopPanelEvent(event);
+          }}
+          onPointerMove={stopPanelEvent}
+          onPointerUp={stopPanelEvent}
+          onPointerCancel={stopPanelEvent}
+          onMouseDown={stopPanelEvent}
+          onMouseMove={stopPanelEvent}
+          onMouseUp={stopPanelEvent}
+          onMouseOver={stopPanelEvent}
+          onMouseOut={stopPanelEvent}
+          onClick={stopPanelEvent}
+          onDoubleClick={stopPanelEvent}
+          onAuxClick={stopPanelEvent}
+          onContextMenu={stopPanelEvent}
+          onWheel={stopPanelEvent}
         >
           <div
             className="pagent-panel-stage"

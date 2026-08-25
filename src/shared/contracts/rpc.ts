@@ -179,6 +179,12 @@ export const rpcSchemas = {
     tabId: z.number().int().optional(),
   }),
   'agent.toggle': z.object({}),
+  'menu.getState': z.object({}),
+  'menu.openCurrent': z.object({}),
+  'menu.hideCurrent': z.object({}),
+  'menu.setPermanentlyHidden': z.object({
+    hidden: z.boolean(),
+  }),
   'session.context': z.object({
     url: z.string().optional(),
   }),
