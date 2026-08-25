@@ -5,6 +5,7 @@ import { SettingsPanel } from '@/features/settings/SettingsPanel';
 import { useStickToBottom } from '../hooks/useStickToBottom';
 import type { ChatMessage, TaskRow } from '@/shared/contracts/session-messages';
 import type { AgentSettings } from '@/shared/contracts/settings';
+import type { ObservedElement } from '@/shared/contracts/page';
 import { PanelHeader } from './PanelHeader';
 import { HistoryDrawer } from './HistoryDrawer';
 import { PageContext } from './PageContext';
@@ -34,6 +35,13 @@ export function AgentPanel({
   onClearSelection,
   onSettingsChange,
   onHeaderPointerDown,
+  imageDataUrl,
+  onMarkScreen,
+  onRemoveImage,
+  selectedElement,
+  selectingElement,
+  onSelectElement,
+  onRemoveElement,
 }: {
   settings: AgentSettings;
   messages: ChatMessage[];
@@ -51,18 +59,25 @@ export function AgentPanel({
   view: 'chat' | 'settings';
   onViewChange: (view: 'chat' | 'settings') => void;
   onClose: () => void;
-  onSubmit: (prompt: string, context?: string) => void;
+  onSubmit: (prompt: string, context?: string, imageDataUrl?: string) => void;
   onStop: () => void;
   onClear: () => void;
   onClearSelection: () => void;
   onSettingsChange: (settings: AgentSettings) => void;
   onHeaderPointerDown?: (event: PointerEvent<HTMLDivElement>) => void;
+  imageDataUrl?: string;
+  onMarkScreen: () => void;
+  onRemoveImage: () => void;
+  selectedElement?: ObservedElement;
+  selectingElement: boolean;
+  onSelectElement: () => void;
+  onRemoveElement: () => void;
 }) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const lastUserId = [...messages].reverse().find((message) => message.role === 'user')?.id;
   const { scrollerRef, contentRef, onScroll } = useStickToBottom({
     enabled: view === 'chat' && !historyOpen,
-    resetKey: `${activeConversationId}:${lastUserId ?? ''}`,
+    resetKey: `${activeConversationId}:${lastUserId ?? ''}:${running}:${thinking}`,
   });
   const activeTitle =
     conversations.find((item) => item.id === activeConversationId)?.title ?? '会话';
@@ -113,8 +128,15 @@ export function AgentPanel({
               {messages.map((message) =>
                 message.role === 'user' ? (
                   <div key={message.id} className="flex justify-end pl-14">
-                    <div className="rounded-xl bg-field px-3 py-1.5 text-[13px] leading-[1.4] text-ink">
-                      {message.content}
+                    <div className="flex max-w-full flex-col gap-1.5 rounded-xl bg-field p-1.5 text-[13px] leading-[1.4] text-ink">
+                      {message.imageDataUrl && (
+                        <img
+                          src={message.imageDataUrl}
+                          alt="已标记的屏幕截图"
+                          className="max-h-40 max-w-full rounded-lg object-contain"
+                        />
+                      )}
+                      <span className="px-1.5">{message.content}</span>
                     </div>
                   </div>
                 ) : (
@@ -138,7 +160,18 @@ export function AgentPanel({
         </div>
 
         {view === 'chat' && (
-          <Composer settings={settings} onSubmit={onSubmit} onSettingsChange={onSettingsChange} />
+          <Composer
+            settings={settings}
+            onSubmit={onSubmit}
+            onSettingsChange={onSettingsChange}
+            imageDataUrl={imageDataUrl}
+            onMarkScreen={onMarkScreen}
+            onRemoveImage={onRemoveImage}
+            selectedElement={selectedElement}
+            selectingElement={selectingElement}
+            onSelectElement={onSelectElement}
+            onRemoveElement={onRemoveElement}
+          />
         )}
       </div>
     </div>

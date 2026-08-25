@@ -35,7 +35,9 @@ export default defineConfig({
       'https://generativelanguage.googleapis.com/*',
       'https://api.deepseek.com/*',
     ],
-    host_permissions: ['https://*/*', 'http://*/*'],
+    // captureVisibleTab only accepts the literal <all_urls> host permission
+    // when the call is initiated from the in-page UI (which does not grant activeTab).
+    host_permissions: ['<all_urls>'],
     icons: {
       16: 'icon-16.png',
       32: 'icon-32.png',

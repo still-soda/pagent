@@ -3,8 +3,18 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createShader, playSweep, accentChain, ACCENTS } from "glimm";
+import {
+  IconArrowUp,
+  IconBrowser,
+  IconCommand,
+  IconPlus,
+  IconPointer,
+  IconScreenshot,
+  IconX,
+} from '@tabler/icons-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { rpc } from '@/shared/extension/rpc-client';
+import type { ObservedElement } from '@/shared/contracts/page';
 import {
   applyComposerInsertion,
   clampMentionMenuHeight,
@@ -42,19 +52,6 @@ const RAINBOW = accentChain([
  * Variants: Rounded (card radius) · Pill (full radius).
  * ───────────────────────────────────────────────────────── */
 
-function Icon({ children, size = 15, strokeWidth = 1.8 }: { children: React.ReactNode; size?: number; strokeWidth?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      {children}
-    </svg>
-  );
-}
-
-const GLYPHS: Record<string, React.ReactNode> = {
-  tab: <g><rect x="3" y="4" width="18" height="14" rx="2" /><path d="M3 9h18" /></g>,
-  command: <g><path d="M4 7h16M4 12h10M4 17h13" /></g>,
-};
-
 const DEMO_TABS: BrowserTab[] = [
   { id: 1, title: "当前页面", url: "https://example.com/app", active: true },
   { id: 2, title: "GitHub", url: "https://github.com/pagent" },
@@ -68,6 +65,8 @@ type MenuRow = {
   badge?: string;
   tab?: BrowserTab;
   command?: SlashCommand;
+  screenMark?: boolean;
+  elementSelect?: boolean;
 };
 
 type PromptModel = { key: string; name: string; tag: string };
@@ -104,6 +103,13 @@ export default function PromptBar({
   models = [],
   modelKey,
   onModelChange,
+  imageDataUrl,
+  onMarkScreen,
+  onRemoveImage,
+  selectedElement,
+  selectingElement = false,
+  onSelectElement,
+  onRemoveElement,
 }: {
   variant?: string;
   /** the self-running walkthrough; turn off when embedding in a real surface */
@@ -111,10 +117,17 @@ export default function PromptBar({
   /** hero sizing: a multi-line input with controls on their own row */
   tall?: boolean;
   placeholder?: string;
-  onSend?: (text: string, context?: string) => void;
+  onSend?: (text: string, context?: string, imageDataUrl?: string) => void;
   models?: PromptModel[];
   modelKey?: string;
   onModelChange?: (key: string) => void;
+  imageDataUrl?: string;
+  onMarkScreen?: () => void;
+  onRemoveImage?: () => void;
+  selectedElement?: ObservedElement;
+  selectingElement?: boolean;
+  onSelectElement?: () => void;
+  onRemoveElement?: () => void;
 }) {
   const pill = variant === "Pill";
   const [draft, setDraft] = useState("");
@@ -158,13 +171,28 @@ export default function PromptBar({
 
   const rows: MenuRow[] =
     menu === "at"
-      ? filterBrowserTabs(tabs, query).map((tab) => ({
-          key: `tab-${tab.id}`,
-          name: tab.title,
-          desc: tabHost(tab.url),
-          badge: tab.active ? "当前" : mentions.some((item) => item.id === tab.id) ? "已选" : undefined,
-          tab,
-        }))
+      ? [
+          ...(plusOpen
+            ? [{
+                key: "select-element",
+                name: "选择元素",
+                desc: "在页面上点击选择一个元素",
+                elementSelect: true,
+              }, {
+                key: "mark-screen",
+                name: "标记屏幕",
+                desc: "截取当前画面并绘制标记",
+                screenMark: true,
+              }]
+            : []),
+          ...filterBrowserTabs(tabs, query).map((tab) => ({
+            key: `tab-${tab.id}`,
+            name: tab.title,
+            desc: tabHost(tab.url),
+            badge: tab.active ? "当前" : mentions.some((item) => item.id === tab.id) ? "已选" : undefined,
+            tab,
+          })),
+        ]
       : menu === "slash"
         ? filterSlashCommands(SLASH_COMMANDS, query).map((command) => ({
             key: command.key,
@@ -343,7 +371,15 @@ export default function PromptBar({
   };
 
   const pick = (row: MenuRow) => {
-    if (row.tab) {
+    if (row.elementSelect) {
+      setPlusOpen(false);
+      onSelectElement?.();
+      return;
+    } else if (row.screenMark) {
+      setPlusOpen(false);
+      onMarkScreen?.();
+      return;
+    } else if (row.tab) {
       setMentions((current) => (current.some((item) => item.id === row.tab!.id) ? current : [...current, row.tab!]));
       setDraft(applyComposerInsertion(draft, token, ""));
     } else if (row.command) {
@@ -354,11 +390,17 @@ export default function PromptBar({
     inputRef.current?.focus();
   };
 
-  const canSend = !preparing && (draft.trim().length > 0 || mentions.length > 0);
+  const canSend = !preparing && (draft.trim().length > 0 || mentions.length > 0 || Boolean(imageDataUrl) || Boolean(selectedElement));
   const send = async () => {
     if (!canSend) return;
     const selectedMentions = [...mentions];
-    const text = visiblePrompt(draft, selectedMentions);
+    const text =
+      visiblePrompt(draft, selectedMentions) ||
+      (imageDataUrl
+        ? "请分析我在屏幕截图中标记的内容。"
+        : selectedElement
+          ? "请分析我选中的页面元素。"
+          : "");
     if (!text) return;
     setPreparing(true);
     setExpanded(false);
@@ -381,7 +423,11 @@ export default function PromptBar({
           // Keep the metadata-only context when one or more pages cannot be read.
         }
       }
-      onSend?.(text, context);
+      if (selectedElement) {
+        const elementContext = `用户选中的当前页面元素：\n${JSON.stringify(selectedElement, null, 2)}`;
+        context = context ? `${context}\n\n${elementContext}` : elementContext;
+      }
+      onSend?.(text, context, imageDataUrl);
     } finally {
       setPreparing(false);
     }
@@ -432,7 +478,15 @@ export default function PromptBar({
                   className="relative z-10 flex h-9 w-full min-w-0 items-center gap-2.5 rounded-[6px] px-2 text-left"
                 >
                   <span className="flex size-5.5 shrink-0 items-center justify-center text-ink-2">
-                    <Icon size={15}>{GLYPHS[row.tab ? "tab" : "command"]}</Icon>
+                    {row.elementSelect ? (
+                      <IconPointer size={16} stroke={2} />
+                    ) : row.screenMark ? (
+                      <IconScreenshot size={16} stroke={2} />
+                    ) : row.tab ? (
+                      <IconBrowser size={16} stroke={2} />
+                    ) : (
+                      <IconCommand size={16} stroke={2} />
+                    )}
                   </span>
                   <span className="min-w-0 shrink truncate text-[12.5px] font-medium text-ink">
                     {row.name}
@@ -465,11 +519,12 @@ export default function PromptBar({
 
       {/* ── composer ───────────────────────────────────── */}
       <div
-        className={`relative isolate flex flex-col overflow-hidden border border-line bg-surface shadow-card transition-[border-color,border-radius] duration-150 focus-within:border-line-strong ${
+        aria-disabled={selectingElement}
+        className={`relative isolate flex flex-col overflow-hidden border border-line bg-surface shadow-card transition-[border-color,border-radius,opacity,filter] duration-150 focus-within:border-line-strong ${
           tall ? "gap-2.5 p-3.5" : "gap-1.5 p-1.5"
         } ${
           pill ? (mentions.length > 0 || wide ? "rounded-[24px]" : "rounded-full") : tall ? "rounded-[22px]" : "rounded-[14px]"
-        }`}
+        } ${selectingElement ? "pointer-events-none opacity-45 grayscale" : ""}`}
       >
         {/* rainbow glimm sweep — plays across the interior on model change.
             explicit w/h: a <canvas> is a replaced element and won't stretch
@@ -498,7 +553,7 @@ export default function PromptBar({
                 }`}
                 style={{ animation: "pop-in 200ms cubic-bezier(0.23,1,0.32,1) both" }}
               >
-                <Icon size={12}>{GLYPHS.tab}</Icon>
+                <IconBrowser size={13} stroke={2} />
                 <span className="max-w-36 truncate">{tab.title}</span>
                 <button
                   type="button"
@@ -508,10 +563,54 @@ export default function PromptBar({
                     pill ? "rounded-full" : "rounded-[5px]"
                   }`}
                 >
-                  <Icon size={10} strokeWidth={2.5}><path d="M18 6L6 18M6 6l12 12" /></Icon>
+                  <IconX size={12} stroke={2.5} />
                 </button>
               </span>
             ))}
+          </div>
+        )}
+
+        {imageDataUrl && (
+          <div className={`flex items-center gap-2 pt-0.5 ${pill ? "px-1" : "px-0.5"}`}>
+            <div className="relative overflow-hidden rounded-lg border border-line bg-field">
+              <img
+                src={imageDataUrl}
+                alt="待发送的屏幕标记"
+                className="h-14 w-24 object-cover"
+              />
+              <button
+                type="button"
+                aria-label="移除屏幕标记"
+                onClick={onRemoveImage}
+                className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-black/65 text-white"
+              >
+                <IconX size={12} stroke={2.5} />
+              </button>
+            </div>
+            <span className="text-[11.5px] text-ink-3">已附加屏幕标记</span>
+          </div>
+        )}
+
+        {selectedElement && (
+          <div className={`flex items-center gap-2 pt-0.5 ${pill ? "px-1" : "px-0.5"}`}>
+            <span className={`flex h-7 min-w-0 max-w-full items-center gap-1.5 bg-field py-1 pr-1 pl-2 text-[11.5px] text-ink-2 shadow-hairline ${
+              pill ? "rounded-full" : "rounded-chip"
+            }`}>
+              <IconPointer size={13} stroke={2} />
+              <span className="min-w-0 truncate">
+                {selectedElement.name || `<${selectedElement.tag}>`}
+              </span>
+              <button
+                type="button"
+                aria-label="移除选中的元素"
+                onClick={onRemoveElement}
+                className={`-my-1 flex size-6 shrink-0 items-center justify-center text-ink-3 transition-colors duration-100 hover:bg-line/70 hover:text-ink ${
+                  pill ? "rounded-full" : "rounded-[5px]"
+                }`}
+              >
+                <IconX size={12} stroke={2.5} />
+              </button>
+            </span>
           </div>
         )}
 
@@ -525,7 +624,7 @@ export default function PromptBar({
         >
           <button
             type="button"
-            aria-label="附加标签页"
+            aria-label="添加内容"
             aria-expanded={plusOpen}
             onClick={() => {
               setPlusOpen((current) => !current);
@@ -535,7 +634,7 @@ export default function PromptBar({
               pill ? "rounded-full" : "rounded-[8px]"
             } ${plusOpen ? "bg-hover text-ink" : ""} ${wide ? "col-start-1 row-start-2" : "col-start-1 row-start-1"}`}
           >
-            <Icon size={16} strokeWidth={2}><path d="M12 5v14M5 12h14" /></Icon>
+            <IconPlus size={17} stroke={2.2} />
           </button>
 
           <textarea
@@ -625,7 +724,7 @@ export default function PromptBar({
               color: canSend ? "var(--primary-foreground)" : "var(--ink-2)",
             }}
           >
-            <Icon size={16} strokeWidth={2.4}><path d="M12 19V5M5 12l7-7 7 7" /></Icon>
+            <IconArrowUp size={17} stroke={2.4} />
           </button>
         </div>
       </div>

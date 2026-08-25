@@ -18,7 +18,7 @@ test('production build includes the content script and permissions', () => {
     expect(manifest.permissions).toEqual(
       expect.arrayContaining(['storage', 'unlimitedStorage', 'scripting', 'activeTab', 'debugger']),
     );
-  expect(manifest.host_permissions).toEqual(expect.arrayContaining(['https://*/*', 'http://*/*']));
+  expect(manifest.host_permissions).toEqual(expect.arrayContaining(['<all_urls>']));
   expect(manifest.content_scripts?.[0]?.js).toEqual(expect.arrayContaining(['content-scripts/content.js']));
   expect(fs.existsSync(path.join(extensionPath, 'content-scripts/content.js'))).toBe(true);
   expect(fs.existsSync(path.join(extensionPath, 'background.js'))).toBe(true);
@@ -48,6 +48,13 @@ test('opens an empty composer at its collapsed height', async ({ baseURL }) => {
     const composerBox = await prompt.locator('..').locator('..').boundingBox();
     expect(promptBox?.height).toBe(28);
     expect(composerBox?.height).toBeLessThanOrEqual(44);
+
+    await page.getByLabel('添加内容').click();
+    await page.getByText('标记屏幕', { exact: true }).click();
+    await expect(page.getByLabel('屏幕标记画布')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByLabel('确认标记')).toBeEnabled();
+    await page.getByLabel('取消标记').click();
+    await expect(prompt).toBeVisible();
   } finally {
     await context.close();
     fs.rmSync(userDataDir, { recursive: true, force: true });

@@ -1,15 +1,30 @@
 import PromptBar from '@/shared/ui/beautiful-ui/primitives/PromptBar';
 import { rpc } from '@/shared/extension/rpc-client';
 import { modelsForProvider, resolveCatalogModel, type AgentSettings } from '@/shared/contracts/settings';
+import type { ObservedElement } from '@/shared/contracts/page';
 
 export function Composer({
   settings,
   onSubmit,
   onSettingsChange,
+  imageDataUrl,
+  onMarkScreen,
+  onRemoveImage,
+  selectedElement,
+  selectingElement,
+  onSelectElement,
+  onRemoveElement,
 }: {
   settings: AgentSettings;
-  onSubmit: (prompt: string, context?: string) => void;
+  onSubmit: (prompt: string, context?: string, imageDataUrl?: string) => void;
   onSettingsChange: (settings: AgentSettings) => void;
+  imageDataUrl?: string;
+  onMarkScreen: () => void;
+  onRemoveImage: () => void;
+  selectedElement?: ObservedElement;
+  selectingElement: boolean;
+  onSelectElement: () => void;
+  onRemoveElement: () => void;
 }) {
   return (
     <div className="mt-auto shrink-0 border-t border-line bg-page p-2">
@@ -17,6 +32,13 @@ export function Composer({
         demo={false}
         placeholder="给当前页面下达任务…"
         onSend={onSubmit}
+        imageDataUrl={imageDataUrl}
+        onMarkScreen={onMarkScreen}
+        onRemoveImage={onRemoveImage}
+        selectedElement={selectedElement}
+        selectingElement={selectingElement}
+        onSelectElement={onSelectElement}
+        onRemoveElement={onRemoveElement}
         modelKey={settings.model.model}
         models={modelsForProvider(settings.model.provider).map((item) => ({
           key: item.id,

@@ -1,7 +1,12 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import { Sparkles } from 'lucide-react';
+import { IconSparkles } from '@tabler/icons-react';
 import { useAgentSession } from '../hooks/useAgentSession';
+import { ScreenAnnotator } from '@/features/canvas/ScreenAnnotator';
+import { ElementPicker } from '@/features/canvas/ElementPicker';
+import { rpc } from '@/shared/extension/rpc-client';
+import type { ObservedElement } from '@/shared/contracts/page';
+import { pageObserver } from '@/features/page/observer';
 import {
   retainPageSelectionOnPointerDown,
   restoreRememberedSelection,
@@ -44,6 +49,12 @@ export function AgentApp({
   const [position, setPosition] = useState<PanelPosition>(positionRef.current);
   const [width, setWidth] = useState(widthRef.current);
   const [manipulating, setManipulating] = useState(false);
+  const [capturingScreen, setCapturingScreen] = useState(false);
+  const [annotationSource, setAnnotationSource] = useState<string>();
+  const [imageDataUrl, setImageDataUrl] = useState<string>();
+  const [selectingElement, setSelectingElement] = useState(false);
+  const [selectedElement, setSelectedElement] = useState<ObservedElement>();
+  const [captureError, setCaptureError] = useState('');
 
   const updatePosition = (next: PanelPosition) => {
     positionRef.current = next;
@@ -168,6 +179,40 @@ export function AgentApp({
   };
   const height = panelSize(width).height;
 
+  const markScreen = async () => {
+    if (capturingScreen) return;
+    setCaptureError('');
+    const panel = panelRef.current;
+    if (panel) {
+      panel.style.transition = 'none';
+      panel.style.opacity = '0';
+      panel.style.pointerEvents = 'none';
+    }
+    setCapturingScreen(true);
+    try {
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      );
+      const screenshot = await rpc('screenshot.capture', { raw: true });
+      if (typeof screenshot !== 'string' || !screenshot.startsWith('data:image/')) {
+        throw new Error('截图数据无效');
+      }
+      setAnnotationSource(screenshot);
+    } catch (error) {
+      console.error('无法截取当前屏幕', error);
+      setCaptureError(error instanceof Error ? error.message : '无法截取当前屏幕');
+      setCapturingScreen(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!captureError) return;
+    const timer = window.setTimeout(() => setCaptureError(''), 4_000);
+    return () => window.clearTimeout(timer);
+  }, [captureError]);
+
+  const panelHidden = capturingScreen || selectingElement;
+
   return (
     <div ref={rootRef} className={`${session.themeClass} pointer-events-none`}>
       <div className="pointer-events-none fixed inset-0">
@@ -181,6 +226,9 @@ export function AgentApp({
             top: open ? position.y : closedPosition.y,
             width: open ? width : 56,
             height: open ? height : 56,
+            opacity: panelHidden ? 0 : undefined,
+            pointerEvents: panelHidden ? 'none' : undefined,
+            transition: panelHidden ? 'none' : undefined,
           }}
           onPointerDown={retainPageSelectionOnPointerDown}
           onMouseDown={retainPageSelectionOnPointerDown}
@@ -224,12 +272,23 @@ export function AgentApp({
               view={session.view}
               onViewChange={session.setView}
               onClose={() => onOpenChange(false)}
-              onSubmit={(prompt, context) => void session.send(prompt, context)}
+              onSubmit={(prompt, context, attachedImage) => {
+                setImageDataUrl(undefined);
+                setSelectedElement(undefined);
+                void session.send(prompt, context, attachedImage);
+              }}
               onStop={() => void session.stop()}
               onClear={session.clear}
               onClearSelection={session.clearSelection}
               onSettingsChange={session.setSettings}
               onHeaderPointerDown={onHeaderPointerDown}
+              imageDataUrl={imageDataUrl}
+              onMarkScreen={() => void markScreen()}
+              onRemoveImage={() => setImageDataUrl(undefined)}
+              selectedElement={selectedElement}
+              selectingElement={selectingElement}
+              onSelectElement={() => setSelectingElement(true)}
+              onRemoveElement={() => setSelectedElement(undefined)}
             />
           </div>
           <button
@@ -244,11 +303,43 @@ export function AgentApp({
           >
             {session.agentActive ? <span className="pagent-fab-halo" aria-hidden /> : null}
             <span className="pagent-fab-face">
-              <Sparkles className="size-6" />
+              <IconSparkles className="size-6" />
             </span>
           </button>
         </div>
       </div>
+      {annotationSource && (
+        <ScreenAnnotator
+          source={annotationSource}
+          onCancel={() => {
+            setAnnotationSource(undefined);
+            setCapturingScreen(false);
+          }}
+          onConfirm={(dataUrl) => {
+            setImageDataUrl(dataUrl);
+            setAnnotationSource(undefined);
+            setCapturingScreen(false);
+          }}
+        />
+      )}
+      {selectingElement && (
+        <ElementPicker
+          onCancel={() => setSelectingElement(false)}
+          onSelect={(element) => {
+            const description = pageObserver.describe(element);
+            if (description) setSelectedElement(description);
+            setSelectingElement(false);
+          }}
+        />
+      )}
+      {captureError && (
+        <div
+          role="alert"
+          className="pointer-events-auto fixed top-4 left-1/2 z-2147483647 -translate-x-1/2 rounded-xl border border-red/25 bg-surface px-4 py-2 text-[12.5px] text-red shadow-raised"
+        >
+          截图失败：{captureError}
+        </div>
+      )}
     </div>
   );
 }
