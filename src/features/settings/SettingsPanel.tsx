@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { IconLoader2, IconRefresh } from '@tabler/icons-react';
 import { AnimatedBadge, type AnimatedBadgeStatus } from '@/shared/ui/beui/animated-badge';
 import { BouncyAccordion } from '@/shared/ui/beui/bouncy-accordion';
 import { Button } from '@/shared/ui/beui/button';
@@ -14,11 +15,14 @@ import {
   DEFAULT_SETTINGS,
   PROVIDER_IDS,
   PROVIDER_PRESETS,
+  resolveModelList,
   modelsForProvider,
+  providerUsesOpenAICompat,
   resolveCatalogModel,
   providerSupportsResponsesApi,
   type AgentSettings,
   type ApiProtocol,
+  type CatalogModel,
   type PermissionState,
   type ProviderId,
 } from '@/shared/contracts/settings';
@@ -86,8 +90,11 @@ export function SettingsPanel({
   const [mcpError, setMcpError] = useState('');
   const [mcpBusy, setMcpBusy] = useState(false);
   const [mcpOpen, setMcpOpen] = useState(false);
+  const [remoteModels, setRemoteModels] = useState<Partial<Record<ProviderId, CatalogModel[]>>>({});
+  const [fetchingModels, setFetchingModels] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const mcpJsonReady = useRef(false);
+  const fetchSeq = useRef(0);
 
   const refresh = async () => {
     const [has, perms, mcp] = await Promise.all([
@@ -156,6 +163,45 @@ export function SettingsPanel({
     onChange(saved);
   };
 
+  const refreshModels = useCallback(
+    async (provider: ProviderId, options?: { force?: boolean }) => {
+      const seq = ++fetchSeq.current;
+      setFetchingModels(true);
+      try {
+        const models = (await rpc('models.list', {
+          provider,
+          baseURL: settings.model.baseURL,
+          force: options?.force,
+        })) as CatalogModel[];
+        if (seq !== fetchSeq.current) return;
+        setRemoteModels((prev) => ({ ...prev, [provider]: models }));
+      } catch (error) {
+        if (seq !== fetchSeq.current) return;
+        setRemoteModels((prev) => ({ ...prev, [provider]: undefined }));
+        setStatus(error instanceof Error ? error.message : String(error));
+      } finally {
+        if (seq === fetchSeq.current) setFetchingModels(false);
+      }
+    },
+    [settings.model.baseURL],
+  );
+
+  // 已保存密钥的服务商自动拉取在线模型列表（防抖，避免输入 Base URL 时频繁请求）
+  useEffect(() => {
+    const provider = settings.model.provider;
+    if (!keys[provider]) return;
+    const timer = setTimeout(() => {
+      void refreshModels(provider);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [settings.model.provider, keys[settings.model.provider], settings.model.baseURL, refreshModels]);
+
+  const provider = settings.model.provider;
+  const preset = PROVIDER_PRESETS[provider];
+  const catalog = modelsForProvider(provider);
+  const remote = remoteModels[provider];
+  const mergedModels = resolveModelList(catalog, remote);
+
   return (
     <div ref={panelRef} className="space-y-3 text-sm text-ink">
       <section className="space-y-2.5 rounded-card border border-line bg-surface p-3">
@@ -163,19 +209,19 @@ export function SettingsPanel({
         <div className="space-y-1.5">
           <Label htmlFor="provider">服务商</Label>
           <Select
-            value={settings.model.provider}
+            value={provider}
             onValueChange={(provider) => {
               const next = provider as ProviderId;
-              const preset = PROVIDER_PRESETS[next];
+              const nextPreset = PROVIDER_PRESETS[next];
               void patch({
                 model: {
                   ...settings.model,
                   provider: next,
-                  model: preset.model,
-                  apiProtocol: preset.apiProtocol,
-                  baseURL:
-                    preset.baseURL ??
-                    (next === 'openai-compatible' ? settings.model.baseURL : undefined),
+                  model: nextPreset.model,
+                  apiProtocol: nextPreset.apiProtocol,
+                  baseURL: providerUsesOpenAICompat(next)
+                    ? (nextPreset.baseURL ?? settings.model.baseURL)
+                    : undefined,
                 },
               });
             }}
@@ -192,12 +238,26 @@ export function SettingsPanel({
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1.5">
+        <div className="relative space-y-1.5">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="absolute -top-1 right-0 h-6 gap-1 px-1.5 text-[11.5px] text-ink-2"
+            disabled={fetchingModels}
+            onClick={() => void refreshModels(provider, { force: true })}
+          >
+            {fetchingModels ? (
+              <IconLoader2 aria-hidden className="size-3.5 animate-spin" />
+            ) : (
+              <IconRefresh aria-hidden className="size-3.5" />
+            )}
+            {fetchingModels ? '获取中…' : '刷新模型列表'}
+          </Button>
           <Label htmlFor="model-name">模型</Label>
           <Select
             value={settings.model.model}
             onValueChange={(model) => {
-              const next = resolveCatalogModel(settings.model.provider, model);
+              const next = resolveCatalogModel(provider, model);
               void patch({
                 model: { ...settings.model, model: next.id, apiProtocol: next.apiProtocol },
               });
@@ -207,18 +267,18 @@ export function SettingsPanel({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {modelsForProvider(settings.model.provider).map((item) => (
+              {mergedModels.map((item) => (
                 <SelectItem key={item.id} value={item.id}>
                   {item.label}
                 </SelectItem>
               ))}
-              {!modelsForProvider(settings.model.provider).some((item) => item.id === settings.model.model) && (
+              {!mergedModels.some((item) => item.id === settings.model.model) && (
                 <SelectItem value={settings.model.model}>{settings.model.model}</SelectItem>
               )}
             </SelectContent>
           </Select>
         </div>
-        {providerSupportsResponsesApi(settings.model.provider) && (
+        {providerSupportsResponsesApi(provider) && (
           <div className="space-y-1.5">
             <Label htmlFor="api-protocol">接口协议</Label>
             <Select
@@ -226,7 +286,7 @@ export function SettingsPanel({
               onValueChange={(value) => {
                 const apiProtocol = value as ApiProtocol;
                 const nextModel =
-                  settings.model.provider === 'deepseek'
+                  provider === 'deepseek'
                     ? apiProtocol === 'responses'
                       ? 'deepseek-v4-flash'
                       : settings.model.model.startsWith('deepseek-v4')
@@ -246,7 +306,7 @@ export function SettingsPanel({
             </Select>
           </div>
         )}
-        {(settings.model.provider === 'openai-compatible' || settings.model.provider === 'deepseek') && (
+        {providerUsesOpenAICompat(provider) && (
           <div className="space-y-1.5">
             <Label htmlFor="base-url">Base URL</Label>
             <Input
@@ -255,11 +315,7 @@ export function SettingsPanel({
               onValueChange={(baseURL) =>
                 void patch({ model: { ...settings.model, baseURL } })
               }
-              placeholder={
-                settings.model.provider === 'deepseek'
-                  ? 'https://api.deepseek.com'
-                  : 'https://your-endpoint/v1'
-              }
+              placeholder={preset.baseURL ?? 'https://your-endpoint/v1'}
             />
           </div>
         )}
@@ -270,7 +326,7 @@ export function SettingsPanel({
             type="password"
             value={key}
             onValueChange={setKey}
-            placeholder={keys[settings.model.provider] ? '已保存密钥，输入新值覆盖' : 'API Key'}
+            placeholder={keys[provider] ? '已保存密钥，输入新值覆盖' : (preset.apiKeyHint ?? 'API Key')}
           />
         </div>
         <div className="flex gap-2">
@@ -278,10 +334,11 @@ export function SettingsPanel({
             size="sm"
             onClick={async () => {
               if (!key.trim()) return;
-              await rpc('secrets.set', { provider: settings.model.provider, apiKey: key.trim() });
+              await rpc('secrets.set', { provider, apiKey: key.trim() });
               setKey('');
               setStatus('密钥已保存到本地');
               await refresh();
+              void refreshModels(provider, { force: true });
             }}
           >
             保存密钥
@@ -293,7 +350,7 @@ export function SettingsPanel({
               setStatus('正在测试连接…');
               try {
                 const result = (await rpc('llm.test', {
-                  provider: settings.model.provider,
+                  provider,
                   model: settings.model.model,
                   baseURL: settings.model.baseURL,
                   apiProtocol: settings.model.apiProtocol,

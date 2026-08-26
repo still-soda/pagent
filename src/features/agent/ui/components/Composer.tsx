@@ -1,6 +1,14 @@
+import { useEffect, useState } from 'react';
 import PromptBar from '@/shared/ui/beautiful-ui/primitives/PromptBar';
 import { rpc } from '@/shared/extension/rpc-client';
-import { modelsForProvider, resolveCatalogModel, type AgentSettings } from '@/shared/contracts/settings';
+import {
+  resolveModelList,
+  modelsForProvider,
+  resolveCatalogModel,
+  type AgentSettings,
+  type CatalogModel,
+  type ProviderId,
+} from '@/shared/contracts/settings';
 import type { ObservedElement } from '@/shared/contracts/page';
 
 export function Composer({
@@ -34,6 +42,33 @@ export function Composer({
   onStartTeaching: () => void;
   placeholder?: string;
 }) {
+  const provider = settings.model.provider;
+  const [remoteModels, setRemoteModels] = useState<Partial<Record<ProviderId, CatalogModel[]>>>({});
+
+  // 与设置页保持一致：自动拉取该服务商的在线模型列表（后台缓存 5 分钟），失败时回退静态目录
+  useEffect(() => {
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void rpc('models.list', { provider })
+        .then((models) => {
+          if (cancelled) return;
+          setRemoteModels((prev) => ({ ...prev, [provider]: models as CatalogModel[] }));
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setRemoteModels((prev) => ({ ...prev, [provider]: undefined }));
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [provider, settings.model.baseURL]);
+
+  const models = resolveModelList(modelsForProvider(provider), remoteModels[provider]).map(
+    (item) => ({ key: item.id, name: item.label, tag: item.tag }),
+  );
+
   return (
     <div className="mt-auto shrink-0 border-t border-line bg-page p-2">
       <PromptBar
@@ -51,13 +86,9 @@ export function Composer({
         onRemoveElement={onRemoveElement}
         onStartTeaching={onStartTeaching}
         modelKey={settings.model.model}
-        models={modelsForProvider(settings.model.provider).map((item) => ({
-          key: item.id,
-          name: item.label,
-          tag: item.tag,
-        }))}
+        models={models}
         onModelChange={(id) => {
-          const next = resolveCatalogModel(settings.model.provider, id);
+          const next = resolveCatalogModel(provider, id);
           void rpc('settings.set', {
             model: {
               ...settings.model,
