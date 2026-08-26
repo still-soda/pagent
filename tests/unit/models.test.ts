@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { createChatModel, resolveApiProtocol, resolveModelBaseURL } from '@/features/agent/runtime/models';
 import {
+  API_PROTOCOLS,
   DEFAULT_SETTINGS,
+  PROVIDER_IDS,
+  resolveModelList,
   modelsForProvider,
   providerSupportsResponsesApi,
+  providerUsesOpenAICompat,
   resolveCatalogModel,
   type AgentSettings,
 } from '@/shared/contracts/settings';
@@ -89,5 +93,62 @@ describe('model providers', () => {
       provider: 'deepseek',
       apiProtocol: 'responses',
     });
+  });
+
+  it('each provider exposes a distinct non-empty catalog', () => {
+    const signatures = PROVIDER_IDS.map((id) => JSON.stringify(modelsForProvider(id).map((m) => m.id)));
+    expect(new Set(signatures).size).toBe(PROVIDER_IDS.length);
+    for (const id of PROVIDER_IDS) {
+      const catalog = modelsForProvider(id);
+      expect(catalog.length).toBeGreaterThan(0);
+      for (const model of catalog) {
+        expect(API_PROTOCOLS).toContain(model.apiProtocol);
+        expect(model.id).toBeTruthy();
+      }
+    }
+  });
+
+  it('resolves preset base URLs for OpenAI-compatible providers', () => {
+    expect(resolveModelBaseURL(settings({ provider: 'moonshot' }))).toBe('https://api.moonshot.cn/v1');
+    expect(resolveModelBaseURL(settings({ provider: 'qwen' }))).toBe(
+      'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    );
+    expect(resolveModelBaseURL(settings({ provider: 'ollama' }))).toBe('http://localhost:11434/v1');
+    // 原生 SDK 服务商不套用 preset baseURL
+    expect(resolveModelBaseURL(settings({ provider: 'anthropic' }))).toBeUndefined();
+  });
+
+  it('builds an Ollama chat model without a key', () => {
+    const ollama = settings({ provider: 'ollama', model: 'qwen3:8b' });
+    expect(providerUsesOpenAICompat('ollama')).toBe(true);
+    expect(() => createChatModel(ollama, {})).not.toThrow();
+    expect(createChatModel(ollama, {})).toMatchObject({
+      useResponsesApi: false,
+      clientConfig: { baseURL: 'http://localhost:11434/v1' },
+    });
+  });
+
+  it('replaces the static catalog entirely once online models are fetched', () => {
+    const base = modelsForProvider('deepseek');
+    const online = [
+      { id: 'deepseek-chat', label: 'deepseek-chat (new)', tag: 'DeepSeek', apiProtocol: 'chat-completions' as const },
+      { id: 'deepseek-new-model', label: 'deepseek-new-model', tag: 'DeepSeek', apiProtocol: 'chat-completions' as const },
+    ];
+    // 在线列表非空时完全覆写，不包含任何内置模型
+    expect(resolveModelList(base, online).map((m) => m.id)).toEqual([
+      'deepseek-chat',
+      'deepseek-new-model',
+    ]);
+    // 未拉取到在线列表（未获取/为空）时回退内置目录
+    expect(resolveModelList(base)).toEqual(base);
+    expect(resolveModelList(base, [])).toEqual(base);
+  });
+
+  it('parses models.list RPC payloads', () => {
+    expect(parseRpcPayload('models.list', { provider: 'moonshot' })).toEqual({ provider: 'moonshot' });
+    expect(
+      parseRpcPayload('models.list', { provider: 'ollama', baseURL: 'http://127.0.0.1:11434', force: true }),
+    ).toEqual({ provider: 'ollama', baseURL: 'http://127.0.0.1:11434', force: true });
+    expect(() => parseRpcPayload('models.list', { provider: 'unknown' })).toThrow();
   });
 });
