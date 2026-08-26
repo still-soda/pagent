@@ -9,8 +9,8 @@ import {
   IconTrash,
 } from '@tabler/icons-react';
 import type { TeachingSession } from '@/shared/contracts/teaching';
-import { Badge } from '@/shared/ui/badge';
-import { Button } from '@/shared/ui/button';
+import { AnimatedBadge } from '@/shared/ui/beui/animated-badge';
+import { Button } from '@/shared/ui/beui/button';
 
 const ACTION_NAMES: Record<string, string> = {
   click: '点击',
@@ -62,16 +62,16 @@ export function FlowConfirmCard({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h3 className="truncate text-[13.5px] font-semibold text-ink">{draft.name}</h3>
-              <Badge variant="success"><IconCheck size={11} />待确认</Badge>
+              <AnimatedBadge status="success">待确认</AnimatedBadge>
             </div>
             <p className="mt-1 text-[11.5px] leading-4.5 text-ink-3">{draft.purpose}</p>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
-          <Badge variant="default"><IconCommand size={11} />/{draft.key}</Badge>
-          <Badge variant="secondary"><IconRoute size={11} />{draft.steps.length} 个步骤</Badge>
-          <Badge variant="secondary"><IconPlayerRecord size={11} />{session.actions.length} 条记录</Badge>
-          <Badge variant="outline"><IconSparkles size={11} />提示词已封装</Badge>
+          <AnimatedBadge status="info" icon={<IconCommand size={11} />}>/{draft.key}</AnimatedBadge>
+          <AnimatedBadge icon={<IconRoute size={11} />}>{draft.steps.length} 个步骤</AnimatedBadge>
+          <AnimatedBadge icon={<IconPlayerRecord size={11} />}>{session.actions.length} 条记录</AnimatedBadge>
+          <AnimatedBadge icon={<IconSparkles size={11} />}>提示词已封装</AnimatedBadge>
         </div>
       </header>
 
@@ -103,7 +103,9 @@ export function FlowConfirmCard({
               <div className="rounded-lg border border-line bg-page px-2.5 py-2">
                 <p className="text-[10.5px] font-semibold text-ink-3">开始前</p>
                 <div className="mt-1.5 flex flex-wrap gap-1">
-                  {draft.prerequisites.map((item) => <Badge key={item} variant="outline">{item}</Badge>)}
+                  {draft.prerequisites.map((item) => (
+                    <AnimatedBadge key={item} showIcon={false}>{item}</AnimatedBadge>
+                  ))}
                 </div>
               </div>
             )}
@@ -124,7 +126,9 @@ export function FlowConfirmCard({
             {session.actions.map((action, index) => (
               <div key={action.id} className="flex items-start gap-2 rounded-lg px-2 py-1.5 hover:bg-hover">
                 <span className="mt-0.5 w-5 shrink-0 text-right font-mono text-[9.5px] text-ink-3">{index + 1}</span>
-                <Badge variant="secondary" className="shrink-0">{ACTION_NAMES[action.kind] ?? action.kind}</Badge>
+                <AnimatedBadge showIcon={false} className="shrink-0">
+                  {ACTION_NAMES[action.kind] ?? action.kind}
+                </AnimatedBadge>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[10.5px] text-ink-2">
                     {action.target?.name || action.target?.text || action.detail || action.page.title || action.page.url}

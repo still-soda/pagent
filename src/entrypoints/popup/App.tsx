@@ -3,6 +3,7 @@ import { IconEye, IconEyeOff, IconSettings, IconSparkles } from '@tabler/icons-r
 import { rpc } from '@/shared/extension/rpc-client';
 import { applyDocumentTheme, resolveThemeClass } from '@/shared/extension/theme';
 import type { AgentSettings } from '@/shared/contracts/settings';
+import { Button } from '@/shared/ui/beui/button';
 
 export function PopupApp() {
   const [settings, setSettings] = useState<AgentSettings>();
@@ -56,37 +57,37 @@ export function PopupApp() {
               {settings ? `${settings.model.provider} · ${settings.model.model}` : '页面内智能 Agent'}
             </p>
           </div>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-sm"
             aria-label="打开设置"
-            className="grid size-8 place-items-center rounded-card text-ink-3 transition-colors hover:bg-hover hover:text-ink"
+            className="rounded-card text-ink-3 hover:bg-hover hover:text-ink"
             onClick={() => void browser.runtime.openOptionsPage()}
           >
             <IconSettings className="size-4.25" stroke={1.9} />
-          </button>
+          </Button>
         </header>
 
         <div className="p-3">
-          <button
-            type="button"
+          <Button
             disabled={Boolean(busy)}
             onClick={() => void run('open', () => rpc('menu.openCurrent', {}))}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-[13px] font-semibold text-primary-foreground shadow-hairline transition-[transform,opacity] hover:opacity-90 active:scale-[0.99] disabled:opacity-50"
+            className="h-10 w-full rounded-xl text-[13px] font-semibold"
           >
             <IconSparkles className="size-4" stroke={2.2} />
             {busy === 'open' ? '正在打开…' : '在当前页面打开'}
-          </button>
+          </Button>
 
           <div className="my-3 h-px bg-line" />
 
           <div className="mb-1 px-1 text-[10px] font-semibold tracking-[0.08em] text-ink-3 uppercase">
             显示设置
           </div>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             disabled={Boolean(busy) || permanentlyHidden}
             onClick={() => void run('current', () => rpc('menu.hideCurrent', {}))}
-            className="group flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition-colors hover:bg-hover disabled:opacity-45"
+            className="group h-auto w-full justify-start rounded-xl px-2.5 py-2.5 text-left whitespace-normal hover:bg-hover disabled:opacity-45"
           >
             <span className="grid size-8 shrink-0 place-items-center rounded-card bg-inset text-ink-2">
               <IconEyeOff className="size-4" stroke={1.9} />
@@ -95,10 +96,10 @@ export function PopupApp() {
               <span className="block text-[12.5px] font-medium">在当前页面隐藏</span>
               <span className="mt-0.5 block text-[10.5px] leading-4 text-ink-3">刷新页面后自动恢复显示</span>
             </span>
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             disabled={Boolean(busy)}
             onClick={() =>
               void run(
@@ -110,7 +111,7 @@ export function PopupApp() {
                 },
               )
             }
-            className="group flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition-colors hover:bg-hover disabled:opacity-45"
+            className="group h-auto w-full justify-start rounded-xl px-2.5 py-2.5 text-left whitespace-normal hover:bg-hover disabled:opacity-45"
           >
             <span className={`grid size-8 shrink-0 place-items-center rounded-card ${
               permanentlyHidden ? 'bg-primary text-primary-foreground' : 'bg-inset text-ink-2'
@@ -127,19 +128,20 @@ export function PopupApp() {
                 {permanentlyHidden ? '在所有网页重新显示 Pagent' : '在所有网页隐藏，可随时从此处恢复'}
               </span>
             </span>
-          </button>
+          </Button>
         </div>
       </section>
 
       <footer className="flex items-center justify-between px-2 pt-2.5 pb-0.5 text-[10px] text-ink-3">
         <span>快捷键 Alt + P</span>
-        <button
-          type="button"
-          className="transition-colors hover:text-ink"
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-auto px-0 py-0 text-[10px] text-ink-3 shadow-none hover:bg-transparent hover:text-ink"
           onClick={() => void browser.runtime.openOptionsPage()}
         >
           设置与模型
-        </button>
+        </Button>
       </footer>
 
       {error && (
