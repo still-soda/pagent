@@ -237,14 +237,6 @@
   opacity: 1;
 }
 
-.pagent-tab-strip {
-  scrollbar-width: none;
-}
-
-.pagent-tab-strip::-webkit-scrollbar {
-  display: none;
-}
-
 .pagent-mention-menu {
   display: flex;
   min-height: 0;
@@ -284,46 +276,21 @@
 }
 
 :host,
+:host *,
 .pagent-window,
-.pagent-history-drawer {
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in oklch, var(--ink-3) 72%, transparent) transparent;
+.pagent-window *,
+.pagent-history-drawer,
+.pagent-history-drawer * {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 :host ::-webkit-scrollbar,
+:host *::-webkit-scrollbar,
 .pagent-window ::-webkit-scrollbar,
-.pagent-history-drawer ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-:host ::-webkit-scrollbar-track,
-.pagent-window ::-webkit-scrollbar-track,
-.pagent-history-drawer ::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-:host ::-webkit-scrollbar-thumb,
-.pagent-window ::-webkit-scrollbar-thumb,
-.pagent-history-drawer ::-webkit-scrollbar-thumb {
-  background: color-mix(in oklch, var(--ink-3) 70%, transparent);
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background-clip: padding-box;
-}
-
-:host ::-webkit-scrollbar-thumb:hover,
-.pagent-window ::-webkit-scrollbar-thumb:hover,
-.pagent-history-drawer ::-webkit-scrollbar-thumb:hover {
-  background: var(--ink-3);
-  background-clip: padding-box;
-}
-
-.pagent-thinking-scroll {
-  scrollbar-width: none;
-}
-
-.pagent-thinking-scroll::-webkit-scrollbar {
+.pagent-window *::-webkit-scrollbar,
+.pagent-history-drawer ::-webkit-scrollbar,
+.pagent-history-drawer *::-webkit-scrollbar {
   display: none;
 }
 

@@ -236,7 +236,7 @@ export default function ThinkingState({
                 )}
                 <span
                   ref={variant === "Reasoning" ? reasoningRef : undefined}
-                  className={`min-w-0 text-[12.5px] ${variant === "Reasoning" ? "pagent-thinking-scroll max-h-48 overflow-y-auto whitespace-pre-wrap leading-relaxed text-ink-2" : "truncate font-medium text-ink"} ${variant === "Search" ? "animated-underline" : ""}`}
+                  className={`min-w-0 text-[12.5px] ${variant === "Reasoning" ? "max-h-48 overflow-y-auto whitespace-pre-wrap leading-relaxed text-ink-2" : "truncate font-medium text-ink"} ${variant === "Search" ? "animated-underline" : ""}`}
                 >
                   {row.primary}
                 </span>

@@ -15,6 +15,8 @@ export default defineConfig({
     resolve: {
       alias: {
         '@': resolve('src'),
+        'node:fs': resolve('src/shims/node-fs.ts'),
+        'node:path': resolve('src/shims/node-path.ts'),
       },
     },
   }),
