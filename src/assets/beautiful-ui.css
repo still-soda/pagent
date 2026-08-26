@@ -120,13 +120,16 @@
   --color-field: var(--field);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
+  --color-border-strong: var(--line-strong);
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
   --color-accent-tint: var(--accent-tint);
   --color-green: var(--green);
   --color-green-tint: var(--green-tint);
+  --color-success: var(--green);
   --color-orange: var(--orange);
   --color-orange-tint: var(--orange-tint);
+  --color-warning: var(--orange);
   --color-red: var(--red);
   --color-red-tint: var(--red-tint);
   --color-background: var(--background);

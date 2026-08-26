@@ -5,15 +5,18 @@
   "tsx": true,
   "tailwind": {
     "config": "",
-    "css": "assets/tailwind.css",
+    "css": "src/assets/tailwind.css",
     "baseColor": "stone",
     "cssVariables": true
   },
   "aliases": {
-    "components": "@/components",
-    "utils": "@/lib/utils",
-    "ui": "@/components/ui",
-    "lib": "@/lib",
-    "hooks": "@/hooks"
+    "components": "@/shared/ui",
+    "utils": "@/shared/utils/utils",
+    "ui": "@/shared/ui",
+    "lib": "@/shared",
+    "hooks": "@/shared/hooks"
+  },
+  "registries": {
+    "@beui": "https://beui.dev/r/{name}.json"
   }
 }
