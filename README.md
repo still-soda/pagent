@@ -50,7 +50,7 @@ pnpm test:e2e
 ## 首次使用
 
 1. 打开任意 http/https 页面，右下角会出现 Pagent。按 `Alt+P` 可呼出或隐藏面板，也可在 `chrome://extensions/shortcuts` 修改快捷键。
-2. 在设置中选择 OpenAI / Anthropic / Google / DeepSeek / OpenAI Compatible，写入 API Key。OpenAI 和兼容端点可切换 Chat Completions 或 `/responses` API；DeepSeek 使用 Chat Completions 以保留流式思考内容。
+2. 在设置中选择服务商（OpenAI / Anthropic / Google Gemini / DeepSeek / Moonshot Kimi / 智谱 GLM / 阿里云百炼 / 火山方舟 / xAI Grok / 硅基流动 / Ollama 本地 / 自定义 OpenAI 兼容），写入 API Key。已保存密钥的服务商会在设置页自动拉取最新模型列表，也可手动刷新；Ollama 本地无需密钥。OpenAI 和兼容端点可切换 Chat Completions 或 `/responses` API；DeepSeek 使用 Chat Completions 以保留流式思考内容。
 3. 密钥写入 `chrome.storage.local`，关闭浏览器后仍保留。
 4. 直接发送任务即可全自动执行。面板顶部始终保留停止按钮。
 
