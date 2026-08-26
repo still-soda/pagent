@@ -686,8 +686,8 @@ export default function PromptBar({
             <span className={`flex h-7 min-w-0 max-w-full items-center gap-1.5 bg-field py-1 pr-1 pl-2 text-[11.5px] text-ink-2 shadow-hairline ${
               pill ? "rounded-full" : "rounded-chip"
             }`}>
-              <IconPointer size={13} stroke={2} />
-              <span className="min-w-0 truncate">
+              <IconPointer size={13} stroke={2} className="size-[13px] shrink-0" />
+              <span className="min-w-0 max-w-48 truncate">
                 {selectedElement.name || `<${selectedElement.tag}>`}
               </span>
               <button
