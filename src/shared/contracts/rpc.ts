@@ -109,6 +109,12 @@ export const llmTestPayloadSchema = z.object({
   apiProtocol: z.enum(API_PROTOCOLS).optional(),
 });
 
+export const modelsListPayloadSchema = z.object({
+  provider: z.enum(PROVIDER_IDS),
+  baseURL: z.string().optional(),
+  force: z.boolean().optional(),
+});
+
 export const rpcSchemas = {
   'dom.observe': observePayloadSchema,
   'dom.search': searchPayloadSchema,
@@ -172,6 +178,7 @@ export const rpcSchemas = {
     provider: z.enum(PROVIDER_IDS).optional(),
   }),
   'secrets.has': z.object({}),
+  'models.list': modelsListPayloadSchema,
   'llm.test': llmTestPayloadSchema,
   'agent.start': z.object({
     prompt: z.string().min(1),

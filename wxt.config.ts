@@ -36,6 +36,14 @@ export default defineConfig({
       'https://api.anthropic.com/*',
       'https://generativelanguage.googleapis.com/*',
       'https://api.deepseek.com/*',
+      'https://api.moonshot.cn/*',
+      'https://open.bigmodel.cn/*',
+      'https://dashscope.aliyuncs.com/*',
+      'https://ark.cn-beijing.volces.com/*',
+      'https://api.x.ai/*',
+      'https://api.siliconflow.cn/*',
+      'http://localhost:11434/*',
+      'http://127.0.0.1:11434/*',
     ],
     // captureVisibleTab only accepts the literal <all_urls> host permission
     // when the call is initiated from the in-page UI (which does not grant activeTab).

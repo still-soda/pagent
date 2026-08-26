@@ -37,6 +37,7 @@ import {
   insertText,
 } from '@/shared/browser/cdp';
 import { testModelConnection } from '@/features/agent/runtime/models';
+import { fetchProviderModels } from '@/features/settings/model-list';
 import { syncMcpServers } from '@/features/mcp/background/mcp-manager';
 import { saveMcpConfig } from '@/shared/storage/storage';
 import { isSparseStore } from '@/features/agent/session/conversations';
@@ -189,6 +190,15 @@ export async function handleRpc(name: RpcName, payload: unknown, senderTabId?: n
       return { ok: true };
     case 'secrets.has':
       return secretPresence();
+    case 'models.list': {
+      const data = parseRpcPayload('models.list', payload);
+      const secrets = await loadSecrets();
+      return fetchProviderModels(data.provider, {
+        apiKey: secrets[data.provider],
+        baseURL: data.baseURL,
+        force: data.force,
+      });
+    }
     case 'llm.test': {
       const data = parseRpcPayload('llm.test', payload);
       const next = await saveSettings({

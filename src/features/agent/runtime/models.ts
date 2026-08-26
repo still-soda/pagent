@@ -2,7 +2,6 @@ import { ChatAnthropic } from '@langchain/anthropic';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { ChatOpenAI } from '@langchain/openai';
 import {
-  DEEPSEEK_BASE_URL,
   PROVIDER_PRESETS,
   providerSupportsResponsesApi,
   type AgentSettings,
@@ -29,27 +28,32 @@ export function resolveApiProtocol(settings: AgentSettings): ApiProtocol {
 
 export function resolveModelBaseURL(settings: AgentSettings): string | undefined {
   const { provider, baseURL } = settings.model;
-  if (provider === 'deepseek') return baseURL?.trim() || DEEPSEEK_BASE_URL;
+  const preset = PROVIDER_PRESETS[provider];
   if (provider === 'openai-compatible') {
     if (!baseURL?.trim()) throw new Error('兼容端点需要填写 Base URL');
     return baseURL.trim();
   }
-  return baseURL?.trim() || undefined;
+  if (provider === 'anthropic' || provider === 'google') {
+    // 原生 SDK 使用固定端点，暂不支持自定义
+    return baseURL?.trim() || undefined;
+  }
+  return baseURL?.trim() || preset.baseURL;
 }
 
 export function createChatModel(settings: AgentSettings, secrets: SecretMap) {
   const { provider, model } = settings.model;
-  const apiKey = resolveApiKey(provider, secrets);
 
   if (provider === 'anthropic') {
-    return new ChatAnthropic({ apiKey, model, temperature: 0 });
+    return new ChatAnthropic({ apiKey: resolveApiKey(provider, secrets), model, temperature: 0 });
   }
   if (provider === 'google') {
-    return new ChatGoogleGenerativeAI({ apiKey, model, temperature: 0 });
+    return new ChatGoogleGenerativeAI({ apiKey: resolveApiKey(provider, secrets), model, temperature: 0 });
   }
 
   const baseURL = resolveModelBaseURL(settings);
   const protocol = resolveApiProtocol(settings);
+  // Ollama 本地端点无需密钥，任意占位即可
+  const apiKey = provider === 'ollama' ? 'ollama' : resolveApiKey(provider, secrets);
   return new ChatOpenAI({
     apiKey,
     model,

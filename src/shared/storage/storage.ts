@@ -17,6 +17,7 @@ import {
 } from './idb';
 import {
   DEFAULT_SETTINGS,
+  PROVIDER_IDS,
   type AgentSettings,
   type SecretMap,
 } from '@/shared/contracts/settings';
@@ -328,13 +329,7 @@ export async function clearSecrets(provider?: keyof SecretMap): Promise<void> {
 
 export async function secretPresence(): Promise<Record<string, boolean>> {
   const secrets = await loadSecrets();
-  return {
-    openai: Boolean(secrets.openai),
-    anthropic: Boolean(secrets.anthropic),
-    google: Boolean(secrets.google),
-    deepseek: Boolean(secrets.deepseek),
-    'openai-compatible': Boolean(secrets['openai-compatible']),
-  };
+  return Object.fromEntries(PROVIDER_IDS.map((id) => [id, Boolean(secrets[id])]));
 }
 
 export function resetSessionReadyForTests(): void {
