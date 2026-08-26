@@ -1,7 +1,7 @@
 import type { PointerEvent } from 'react';
 
 export function PanelHeader({
-  activeTitle,
+  running,
   workingOnThisPage,
   view,
   onClear,
@@ -9,7 +9,7 @@ export function PanelHeader({
   onMinimize,
   onHeaderPointerDown,
 }: {
-  activeTitle: string;
+  running: boolean;
   workingOnThisPage: boolean;
   view: 'chat' | 'settings';
   onClear: () => void;
@@ -17,32 +17,31 @@ export function PanelHeader({
   onMinimize: () => void;
   onHeaderPointerDown?: (event: PointerEvent<HTMLDivElement>) => void;
 }) {
+  const statusLabel = running ? '工作中' : '准备就绪';
+
   return (
     <div
-      className="flex h-10 shrink-0 cursor-grab items-center gap-1.5 border-b border-line px-2 select-none active:cursor-grabbing"
+      className="flex h-10 shrink-0 cursor-grab items-center gap-2 border-b border-line pr-2 pl-3.5 select-none active:cursor-grabbing"
       onPointerDown={onHeaderPointerDown}
     >
-      <span aria-hidden className="grid h-4 w-2.5 shrink-0 grid-cols-2 gap-[3px] text-ink-3">
-        {Array.from({ length: 6 }, (_, index) => (
-          <span key={index} className="size-[3px] rounded-full bg-current" />
-        ))}
-      </span>
       <span
         className={`pagent-led ${workingOnThisPage ? 'is-on' : ''}`}
         title={workingOnThisPage ? 'Agent 正在此页面工作' : 'Agent 未在此页面工作'}
         aria-label={workingOnThisPage ? 'Agent 正在此页面工作' : 'Agent 未在此页面工作'}
       />
-      <div className="min-w-0 flex-1 px-0.5">
+      <div className="min-w-0 flex-1">
         <span
-          className="block truncate text-[13px] text-ink-2"
-          title={activeTitle}
+          className={`block truncate text-[12px] font-medium ${
+            running ? 'text-ink' : 'text-ink-3'
+          }`}
+          aria-live="polite"
         >
-          {activeTitle}
+          {statusLabel}
         </span>
       </div>
       <div className="flex shrink-0 items-center gap-1">
         {[
-          { label: '清空上下文', onClick: onClear, path: <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" /> },
+          { label: '清空对话', onClick: onClear, path: <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" /> },
           {
             label: '设置',
             onClick: () => onViewChange(view === 'settings' ? 'chat' : 'settings'),

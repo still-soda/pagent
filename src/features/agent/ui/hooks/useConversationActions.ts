@@ -108,21 +108,6 @@ export function useConversationActions(options: {
     );
   }, [setAgentActive, setConversations, setWorkingOnThisPage]);
 
-  const clear = useCallback(() => {
-    const id = activeIdRef.current;
-    bumpRevision();
-    setConversations((current) =>
-      patchConversation(current, id, (item) => ({
-        ...item,
-        messages: [],
-        tasks: [],
-        error: '',
-        thinking: '',
-        budget: { modelCalls: 0, toolCalls: 0 },
-      })),
-    );
-  }, [activeIdRef, bumpRevision, setConversations]);
-
   const createConversation = useCallback(async () => {
     const domain = conversationVaultKey(pageUrlRef.current);
     const nextRevision = bumpRevision();
@@ -237,7 +222,6 @@ export function useConversationActions(options: {
   return {
     send,
     stop,
-    clear,
     createConversation,
     selectConversation,
     closeTab,

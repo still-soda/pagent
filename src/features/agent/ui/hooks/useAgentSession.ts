@@ -158,7 +158,6 @@ export function useAgentSession() {
     clearSelection,
     send: actions.send,
     stop: actions.stop,
-    clear: actions.clear,
     createConversation: actions.createConversation,
     selectConversation: actions.selectConversation,
     closeTab: actions.closeTab,

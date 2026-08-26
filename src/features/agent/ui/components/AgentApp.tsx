@@ -375,7 +375,6 @@ export function AgentApp({
                 }
               }}
               onStop={() => void session.stop()}
-              onClear={session.clear}
               onClearSelection={session.clearSelection}
               onSettingsChange={session.setSettings}
               onHeaderPointerDown={onHeaderPointerDown}

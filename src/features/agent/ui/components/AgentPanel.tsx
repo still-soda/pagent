@@ -1,8 +1,10 @@
-import { useState } from 'react';
-import type { PointerEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { PointerEvent, UIEvent, WheelEvent } from 'react';
+import { IconEye } from '@tabler/icons-react';
 import LoadingState from '@/shared/ui/beautiful-ui/primitives/LoadingState';
 import { SettingsPanel } from '@/features/settings/SettingsPanel';
 import { useStickToBottom } from '../hooks/useStickToBottom';
+import { messagesAfter, olderRoundStartId, visibleWindow } from '../message-window';
 import type { ChatMessage, TaskRow } from '@/shared/contracts/session-messages';
 import type { AgentSettings } from '@/shared/contracts/settings';
 import type { ObservedElement } from '@/shared/contracts/page';
@@ -16,6 +18,24 @@ import { FlowConfirmCard } from '@/features/teaching/ui/FlowConfirmCard';
 import { CommandSavedAlert } from '@/features/teaching/ui/CommandSavedAlert';
 import { isRecentConversation } from '@/features/agent/session/conversations';
 import type { SavedCommand, TeachingSession } from '@/shared/contracts/teaching';
+
+const LOAD_OLDER_TOP_PX = 64;
+
+function HiddenMessagesBanner({ count, onShow }: { count: number; onShow: () => void }) {
+  return (
+    <div className="flex items-center justify-center gap-1 py-0.5 text-[12px] text-ink-3">
+      <span>隐藏了 {count} 条消息</span>
+      <button
+        type="button"
+        aria-label="显示隐藏的消息"
+        onClick={onShow}
+        className="flex size-5 items-center justify-center rounded-[5px] text-ink-3 transition-colors hover:bg-hover hover:text-ink"
+      >
+        <IconEye size={13} stroke={2} />
+      </button>
+    </div>
+  );
+}
 
 export function AgentPanel({
   settings,
@@ -38,7 +58,6 @@ export function AgentPanel({
   onClose,
   onSubmit,
   onStop,
-  onClear,
   onClearSelection,
   onSettingsChange,
   onHeaderPointerDown,
@@ -76,7 +95,6 @@ export function AgentPanel({
   onClose: () => void;
   onSubmit: (prompt: string, context?: string, imageDataUrl?: string) => void;
   onStop: () => void;
-  onClear: () => void;
   onClearSelection: () => void;
   onSettingsChange: (settings: AgentSettings) => void;
   onHeaderPointerDown?: (event: PointerEvent<HTMLDivElement>) => void;
@@ -95,14 +113,77 @@ export function AgentPanel({
   onConfirmTeaching: () => void;
 }) {
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [hiddenAfterIds, setHiddenAfterIds] = useState<Record<string, string | undefined>>({});
+  const [visibleFromId, setVisibleFromId] = useState<string | undefined>();
+  const pendingRevealRef = useRef(false);
+  const restoringRef = useRef<{ height: number; top: number } | null>(null);
+  const ignoreScrollLoadRef = useRef(true);
+  const lastLoadScrollTopRef = useRef(0);
+  const sourceMessages = messagesAfter(messages, hiddenAfterIds[activeConversationId]);
+  const renderedMessages = visibleWindow(sourceMessages, visibleFromId);
+  const hiddenCount = messages.length - sourceMessages.length;
+  const hidingCurrentTurn = sourceMessages.length === 0 && hiddenCount > 0;
   const lastUserId = [...messages].reverse().find((message) => message.role === 'user')?.id;
-  const { scrollerRef, contentRef, onScroll } = useStickToBottom({
+  const { scrollerRef, contentRef, onScroll, unpin } = useStickToBottom({
     enabled: view === 'chat' && !historyOpen,
     resetKey: `${activeConversationId}:${lastUserId ?? ''}:${running}:${thinking}`,
   });
-  const activeTitle =
-    conversations.find((item) => item.id === activeConversationId)?.title ?? '会话';
+  const sourceRef = useRef(sourceMessages);
+  const fromIdRef = useRef(visibleFromId);
+  sourceRef.current = sourceMessages;
+  fromIdRef.current = visibleFromId;
 
+  useEffect(() => {
+    setVisibleFromId(undefined);
+    ignoreScrollLoadRef.current = true;
+  }, [activeConversationId]);
+
+  const loadOlder = useCallback(() => {
+    if (restoringRef.current) return;
+    const olderId = olderRoundStartId(sourceRef.current, fromIdRef.current);
+    const scroller = scrollerRef.current;
+    if (!olderId || !scroller) return;
+    unpin();
+    restoringRef.current = { height: scroller.scrollHeight, top: scroller.scrollTop };
+    setVisibleFromId(olderId);
+  }, [scrollerRef, unpin]);
+
+  useLayoutEffect(() => {
+    if (!pendingRevealRef.current) return;
+    pendingRevealRef.current = false;
+    unpin();
+    const scroller = scrollerRef.current;
+    if (scroller) scroller.scrollTop = 0;
+  }, [hiddenAfterIds, unpin]);
+
+  useLayoutEffect(() => {
+    const restore = restoringRef.current;
+    if (!restore) return;
+    const scroller = scrollerRef.current;
+    if (scroller) {
+      scroller.scrollTop = restore.top + (scroller.scrollHeight - restore.height);
+      lastLoadScrollTopRef.current = scroller.scrollTop;
+    }
+    restoringRef.current = null;
+  }, [visibleFromId]);
+
+  const handleScroll = (event: UIEvent<HTMLDivElement>) => {
+    onScroll();
+    const top = event.currentTarget.scrollTop;
+    if (ignoreScrollLoadRef.current) {
+      ignoreScrollLoadRef.current = false;
+      lastLoadScrollTopRef.current = top;
+      return;
+    }
+    const scrollingUp = top < lastLoadScrollTopRef.current;
+    lastLoadScrollTopRef.current = top;
+    if (scrollingUp && top <= LOAD_OLDER_TOP_PX) loadOlder();
+  };
+
+  const handleWheel = (event: WheelEvent<HTMLDivElement>) => {
+    if (event.deltaY >= 0) return;
+    if (event.currentTarget.scrollTop <= LOAD_OLDER_TOP_PX) loadOlder();
+  };
   // 标签页只展示最近 3h 内活跃（且未被关闭）的会话 + 当前会话；其余保留在历史抽屉中
   const tabs = conversations.filter(
     (item) =>
@@ -119,13 +200,19 @@ export function AgentPanel({
   return (
     <div className="pagent-window relative flex h-[min(680px,calc(100vh-48px))] w-full flex-col self-start">
       <PanelHeader
-        activeTitle={activeTitle}
+        running={running}
         workingOnThisPage={workingOnThisPage}
         view={view}
-        onClear={onClear}
         onViewChange={onViewChange}
         onMinimize={onClose}
         onHeaderPointerDown={onHeaderPointerDown}
+        onClear={() => {
+          setVisibleFromId(undefined);
+          setHiddenAfterIds((current) => ({
+            ...current,
+            [activeConversationId]: messages.at(-1)?.id,
+          }));
+        }}
       />
 
       <TabStrip
@@ -156,7 +243,8 @@ export function AgentPanel({
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div
           ref={scrollerRef}
-          onScroll={onScroll}
+          onScroll={handleScroll}
+          onWheel={handleWheel}
           className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overflow-x-hidden overscroll-contain px-3 pt-2.5 pb-2"
         >
           {view === 'settings' ? (
@@ -164,7 +252,21 @@ export function AgentPanel({
           ) : (
             <div ref={contentRef} className="flex flex-col gap-2.5">
               <PageContext page={page} onClearSelection={onClearSelection} />
-              {messages.map((message) =>
+              {hiddenCount > 0 && (
+                <HiddenMessagesBanner
+                  count={hiddenCount}
+                  onShow={() => {
+                    pendingRevealRef.current = true;
+                    unpin();
+                    setHiddenAfterIds((current) => {
+                      const next = { ...current };
+                      delete next[activeConversationId];
+                      return next;
+                    });
+                  }}
+                />
+              )}
+              {renderedMessages.map((message) =>
                 message.role === 'user' ? (
                   <div key={message.id} className="flex justify-end pl-14">
                     <div className="flex max-w-full flex-col gap-1.5 rounded-xl bg-field p-1.5 text-[13px] leading-[1.4] text-ink">
@@ -182,7 +284,7 @@ export function AgentPanel({
                   <AssistantMessage
                     key={message.id}
                     message={message}
-                    streaming={running && message === messages.at(-1)}
+                    streaming={running && message === renderedMessages.at(-1)}
                   />
                 ),
               )}
@@ -197,10 +299,10 @@ export function AgentPanel({
               {confirmedCommand && (
                 <CommandSavedAlert command={confirmedCommand} />
               )}
-              {running && !hasAssistantOutput(messages.at(-1)) && (
+              {running && !hidingCurrentTurn && !hasAssistantOutput(renderedMessages.at(-1)) && (
                 <LoadingState label={thinking || '正在思考…'} variant="Dots" />
               )}
-              {error && (
+              {error && !hidingCurrentTurn && (
                 <div className="rounded-card bg-red-tint px-3 py-2 text-[12.5px] text-red">
                   {error}
                 </div>

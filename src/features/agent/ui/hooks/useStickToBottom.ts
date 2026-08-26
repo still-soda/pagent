@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 
 export const STICK_TO_BOTTOM_THRESHOLD = 48;
 
@@ -90,5 +90,9 @@ export function useStickToBottom(options: { enabled?: boolean; resetKey?: string
     if (!wasPinned && pinnedRef.current) stick();
   };
 
-  return { scrollerRef, contentRef, onScroll };
+  const unpin = useCallback(() => {
+    pinnedRef.current = false;
+  }, []);
+
+  return { scrollerRef, contentRef, onScroll, unpin };
 }
