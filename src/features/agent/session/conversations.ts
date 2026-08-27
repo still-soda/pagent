@@ -26,6 +26,17 @@ export function isRecentConversation(
   return (item.updatedAt ?? 0) > now - RECENT_TAB_WINDOW_MS;
 }
 
+/** 选择最近活跃窗口内最后更新的会话。 */
+export function latestRecentConversation<T extends { updatedAt?: number }>(
+  items: T[],
+  now = Date.now(),
+): T | undefined {
+  return items.reduce<T | undefined>((latest, item) => {
+    if (!isRecentConversation(item, now)) return latest;
+    return !latest || (item.updatedAt ?? 0) > (latest.updatedAt ?? 0) ? item : latest;
+  }, undefined);
+}
+
 export function isSparseConversation(item: PageConversation | null | undefined): boolean {
   if (!item) return true;
   return item.messages.length === 0 && !item.running && !item.thinking && !item.error;

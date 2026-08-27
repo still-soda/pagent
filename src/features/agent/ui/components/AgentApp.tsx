@@ -22,7 +22,6 @@ import {
   type PanelResizeEdge,
 } from '@/shared/extension/panel-position';
 import { applyShadowTheme } from '@/shared/extension/theme';
-import { isRecentConversation } from '@/features/agent/session/conversations';
 import { AgentPanel } from './AgentPanel';
 import { TeachingOrb } from '@/features/teaching/ui/TeachingOrb';
 import { useTeachingSession } from '@/features/teaching/ui/useTeachingSession';
@@ -62,14 +61,13 @@ export function AgentApp({
   const [celebrating, setCelebrating] = useState(false);
   const wasActiveRef = useRef(session.agentActive);
 
-  // 面板首次打开时：若没有任何 3h 内活跃的会话，则自动新建一个会话
+  // 面板首次打开时只保留一个标签：优先最近 3h 内最后更新的会话，否则新建会话。
   const freshSessionRef = useRef(false);
   useEffect(() => {
     if (!open || !session.ready || freshSessionRef.current) return;
     freshSessionRef.current = true;
-    const hasRecent = session.conversations.some((item) => isRecentConversation(item));
-    if (!hasRecent && !session.agentActive) void session.createConversation();
-  }, [open, session.ready, session.conversations, session.agentActive, session.createConversation]);
+    void session.openInitialConversation();
+  }, [open, session.ready, session.openInitialConversation]);
 
   const updatePosition = (next: PanelPosition) => {
     positionRef.current = next;

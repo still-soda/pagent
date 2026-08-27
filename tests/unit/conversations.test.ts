@@ -5,6 +5,7 @@ import {
   conversationTabKey,
   emptyConversation,
   isRecentConversation,
+  latestRecentConversation,
   isSparseStore,
   mergeConversationStores,
   pickConversationStore,
@@ -34,6 +35,15 @@ describe('page conversations', () => {
     expect(isRecentConversation({ updatedAt: now - RECENT_TAB_WINDOW_MS }, now)).toBe(false);
     expect(isRecentConversation({ updatedAt: now }, now)).toBe(true);
     expect(isRecentConversation({ updatedAt: undefined }, now)).toBe(false);
+  });
+
+  it('selects only the latest conversation within the 3h window', () => {
+    const now = 1_800_000_000_000;
+    const old = { id: 'old', updatedAt: now - RECENT_TAB_WINDOW_MS };
+    const recent = { id: 'recent', updatedAt: now - 2_000 };
+    const latest = { id: 'latest', updatedAt: now - 1_000 };
+    expect(latestRecentConversation([old, recent, latest], now)).toBe(latest);
+    expect(latestRecentConversation([old], now)).toBeUndefined();
   });
 
   it('merges two non-empty stores by conversation id', () => {

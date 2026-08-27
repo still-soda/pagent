@@ -3,6 +3,7 @@ import { rpc } from '@/shared/extension/rpc-client';
 import {
   emptyConversation,
   isRecentConversation,
+  latestRecentConversation,
   nextConversationTitle,
   settleFinishedConversation,
   titleFromPrompt,
@@ -108,7 +109,7 @@ export function useConversationActions(options: {
     );
   }, [setAgentActive, setConversations, setWorkingOnThisPage]);
 
-  const createConversation = useCallback(async () => {
+  const createConversation = useCallback(() => {
     const domain = conversationVaultKey(pageUrlRef.current);
     const nextRevision = bumpRevision();
     const current = conversationsRef.current;
@@ -117,20 +118,47 @@ export function useConversationActions(options: {
       domain ? [domain] : [],
     );
     const nextConversations = [...current, next];
-    await rpc('session.saveStore', {
+    activeIdRef.current = next.id;
+    conversationsRef.current = nextConversations;
+    setActiveId(next.id);
+    setConversations(nextConversations);
+    setView('chat');
+    void rpc('session.saveStore', {
       activeId: next.id,
       conversations: nextConversations,
       url: pageUrlRef.current,
       revision: nextRevision,
       sessionId: sessionIdRef.current,
       deletedConversationIds: [...deletedConversationIdsRef.current],
-    });
-    activeIdRef.current = next.id;
-    conversationsRef.current = nextConversations;
-    setActiveId(next.id);
-    setConversations(nextConversations);
-    setView('chat');
+    }).catch(() => {});
   }, [activeIdRef, bumpRevision, conversationsRef, deletedConversationIdsRef, pageUrlRef, sessionIdRef, setActiveId, setConversations, setView]);
+
+  const openInitialConversation = useCallback(async () => {
+    const current = conversationsRef.current;
+    const recent = latestRecentConversation(current);
+    const nextClosedTabIds = new Set(
+      current.filter((item) => item.id !== recent?.id).map((item) => item.id),
+    );
+    closedTabIdsRef.current = nextClosedTabIds;
+    setClosedTabIds(nextClosedTabIds);
+    if (!recent) {
+      await createConversation();
+      return;
+    }
+    bumpRevision();
+    activeIdRef.current = recent.id;
+    setActiveId(recent.id);
+    setView('chat');
+  }, [
+    activeIdRef,
+    bumpRevision,
+    closedTabIdsRef,
+    conversationsRef,
+    createConversation,
+    setActiveId,
+    setClosedTabIds,
+    setView,
+  ]);
 
   const selectConversation = useCallback(
     (id: string) => {
@@ -223,6 +251,7 @@ export function useConversationActions(options: {
     send,
     stop,
     createConversation,
+    openInitialConversation,
     selectConversation,
     closeTab,
     deleteConversation,
