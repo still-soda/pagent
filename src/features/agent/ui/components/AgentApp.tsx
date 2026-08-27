@@ -6,6 +6,7 @@ import { ElementPicker } from '@/features/canvas/ElementPicker';
 import { rpc } from '@/shared/extension/rpc-client';
 import type { ObservedElement } from '@/shared/contracts/page';
 import { pageObserver } from '@/features/page/observer';
+import { uiEvents } from '@/features/page/ui-events';
 import {
   notePagentInteraction,
 } from '@/features/page/selection';
@@ -58,6 +59,7 @@ export function AgentApp({
   const [selectingElement, setSelectingElement] = useState(false);
   const [selectedElement, setSelectedElement] = useState<ObservedElement>();
   const [captureError, setCaptureError] = useState('');
+  const [toolCaptureHidden, setToolCaptureHidden] = useState(false);
   const [celebrating, setCelebrating] = useState(false);
   const wasActiveRef = useRef(session.agentActive);
 
@@ -86,6 +88,17 @@ export function AgentApp({
   useLayoutEffect(() => {
     applyShadowTheme(rootRef.current, session.themeClass);
   }, [session.themeClass]);
+
+  useEffect(() => {
+    const hideForCapture = () => setToolCaptureHidden(true);
+    const restoreAfterCapture = () => setToolCaptureHidden(false);
+    uiEvents.addEventListener('capture-start', hideForCapture);
+    uiEvents.addEventListener('capture-end', restoreAfterCapture);
+    return () => {
+      uiEvents.removeEventListener('capture-start', hideForCapture);
+      uiEvents.removeEventListener('capture-end', restoreAfterCapture);
+    };
+  }, []);
 
   const restoredRef = useRef(false);
   const attachKeyRef = useRef(session.attachKey);
@@ -283,7 +296,11 @@ export function AgentApp({
     return () => window.clearTimeout(timer);
   }, [captureError]);
 
-  const panelHidden = capturingScreen || selectingElement;
+  const agentCapturingScreen = session.tasks.some(
+    (task) => task.title === 'capture_screenshot' && task.status === 'running',
+  );
+  const panelHidden =
+    capturingScreen || toolCaptureHidden || agentCapturingScreen || selectingElement;
   const stopPanelEvent = (event: { stopPropagation: () => void }) => {
     event.stopPropagation();
   };

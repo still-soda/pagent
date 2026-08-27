@@ -127,9 +127,15 @@ export default defineContentScript({
       }
       if (message.kind !== 'content-command') return;
       Promise.resolve(handleContentCommand(message.name, message.payload ?? {}))
-        .then((result) => {
+        .then(async (result) => {
           if (result && typeof result === 'object' && 'uiCommand' in result) {
-            dispatchUiCommand(result.uiCommand as UiCommand);
+            const uiCommand = result.uiCommand as UiCommand;
+            dispatchUiCommand(uiCommand);
+            if (uiCommand === 'ui.capture.start') {
+              await new Promise<void>((resolve) =>
+                requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+              );
+            }
             sendResponse({ ok: true, result: { ok: true } });
             return;
           }

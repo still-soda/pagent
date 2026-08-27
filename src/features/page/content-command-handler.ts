@@ -24,6 +24,8 @@ export function handleContentCommand(name: string, payload: Record<string, unkno
     case 'ui.toggle':
     case 'ui.open':
     case 'ui.hide':
+    case 'ui.capture.start':
+    case 'ui.capture.end':
       return { ok: true, uiCommand: name };
     case 'dom.observe':
       return pageObserver.observe(document, Number(payload.maxElements ?? 140));

@@ -106,17 +106,27 @@ export function createBridge(
 ) {
   const tabId = () => control.tabId;
   const currentUrl = async () => (await browser.tabs.get(tabId())).url;
+  const captureWithHiddenPanel = async <T>(capture: (targetTabId: number) => Promise<T>): Promise<T> => {
+    const targetTabId = tabId();
+    await sendToContent(targetTabId, 'ui.capture.start', {});
+    try {
+      return await capture(targetTabId);
+    } finally {
+      await sendToContent(targetTabId, 'ui.capture.end', {}).catch(() => {});
+    }
+  };
   return {
     get tabId() {
       return tabId();
     },
     settings,
     content: <T,>(name: string, payload?: unknown) => sendToContent<T>(tabId(), name, payload),
-    screenshot: async (fullPage?: boolean) => {
-      if (fullPage) return trimDataUrl(await captureCdpScreenshot(tabId(), true));
-      const tab = await browser.tabs.get(tabId());
-      return trimDataUrl(await captureVisibleTab(tab.windowId));
-    },
+    screenshot: async (fullPage?: boolean) =>
+      captureWithHiddenPanel(async (targetTabId) => {
+        if (fullPage) return trimDataUrl(await captureCdpScreenshot(targetTabId, true));
+        const tab = await browser.tabs.get(targetTabId);
+        return trimDataUrl(await captureVisibleTab(tab.windowId));
+      }),
     navigate: (url: string) => navigateTab(tabId(), url),
     back: () => goBack(tabId()),
     forward: () => goForward(tabId()),
@@ -146,7 +156,9 @@ export function createBridge(
         return { ok: true };
       },
       screenshot: async (fullPage?: boolean) =>
-        trimDataUrl(await captureCdpScreenshot(tabId(), Boolean(fullPage))),
+        captureWithHiddenPanel(async (targetTabId) =>
+          trimDataUrl(await captureCdpScreenshot(targetTabId, Boolean(fullPage))),
+        ),
       network: (filter?: Parameters<typeof getNetworkLog>[1]) => getNetworkLog(tabId(), filter),
       console: (filter?: Parameters<typeof getConsoleLog>[1]) => getConsoleLog(tabId(), filter),
       request: (requestId: string, includeBody?: boolean) =>
