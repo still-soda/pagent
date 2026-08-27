@@ -24,6 +24,8 @@ import {
   clampMentionMenuHeight,
   composerNeedsFullWidth,
   visiblePrompt,
+  slashCommandContext,
+  mergeComposerContexts,
   mentionedTabsContext,
   filterBrowserTabs,
   filterSlashCommands,
@@ -468,29 +470,24 @@ export default function PromptBar({
     }
     closeMenus();
     try {
-      let context = mentionedTabsContext(selectedMentions) || undefined;
-      if (selectedFlowCommand) {
-        const commandContext = [
-          `用户选择了命令 /${selectedFlowCommand.key}（${selectedFlowCommand.name}）。`,
-          '以下是该命令封装的执行说明，请结合用户当前补充要求执行，不要向用户复述整段说明：',
-          selectedFlowCommand.prompt,
-        ].join('\n');
-        context = context ? `${context}\n\n${commandContext}` : commandContext;
-      }
+      let tabsContext = mentionedTabsContext(selectedMentions) || undefined;
       if (!demo && selectedMentions.length > 0) {
         try {
           const snapshots = (await rpc("tabs.snapshot", {
             tabIds: selectedMentions.map((tab) => tab.id),
           })) as MentionedTabSnapshot[];
-          context = mentionedTabsContext(selectedMentions, snapshots) || undefined;
+          tabsContext = mentionedTabsContext(selectedMentions, snapshots) || undefined;
         } catch {
           // Keep the metadata-only context when one or more pages cannot be read.
         }
       }
-      if (selectedElement) {
-        const elementContext = `用户选中的当前页面元素：\n${JSON.stringify(selectedElement, null, 2)}`;
-        context = context ? `${context}\n\n${elementContext}` : elementContext;
-      }
+      const commandContext = selectedFlowCommand
+        ? slashCommandContext(selectedFlowCommand)
+        : undefined;
+      const elementContext = selectedElement
+        ? `用户选中的当前页面元素：\n${JSON.stringify(selectedElement, null, 2)}`
+        : undefined;
+      const context = mergeComposerContexts(tabsContext, commandContext, elementContext);
       onSend?.(text, context, imageDataUrl);
     } finally {
       setPreparing(false);

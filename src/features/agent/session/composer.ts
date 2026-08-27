@@ -172,6 +172,23 @@ export function visiblePrompt(draft: string, tabs: BrowserTab[]): string {
   return draft.trim() || (tabs.length > 0 ? '请查看这些标签页。' : '');
 }
 
+export function slashCommandContext(command: SlashCommand): string {
+  return [
+    `用户明确选择了命令 /${command.key}（${command.name}）。`,
+    '必须结合用户当前补充要求，按照以下命令说明执行；不要向用户复述整段说明。',
+    '<command_instructions>',
+    command.prompt,
+    '</command_instructions>',
+  ].join('\n');
+}
+
+export function mergeComposerContexts(
+  ...contexts: Array<string | null | undefined>
+): string | undefined {
+  const merged = contexts.map((value) => value?.trim()).filter(Boolean).join('\n\n');
+  return merged || undefined;
+}
+
 export function mentionedTabsContext(
   tabs: BrowserTab[],
   snapshots: MentionedTabSnapshot[] = [],

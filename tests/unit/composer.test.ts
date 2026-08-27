@@ -5,11 +5,13 @@ import {
   composerNeedsFullWidth,
   filterBrowserTabs,
   filterSlashCommands,
+  mergeComposerContexts,
   mentionedTabsContext,
   MENTION_MENU_MAX_HEIGHT,
   normalizeBrowserTabs,
   parseComposerToken,
   SLASH_COMMANDS,
+  slashCommandContext,
   tabHost,
   visiblePrompt,
 } from '@/features/agent/session/composer';
@@ -53,6 +55,20 @@ describe('slash commands', () => {
   it('shows Chinese labels without a leading slash', () => {
     expect(SLASH_COMMANDS.every((command) => !command.name.startsWith('/'))).toBe(true);
     expect(SLASH_COMMANDS.map((command) => command.name)).toContain('观测页面');
+  });
+
+  it('keeps command instructions when combined with other attachments', () => {
+    const command = slashCommandContext({
+      key: 'publish',
+      name: '发布内容',
+      desc: '发布当前草稿',
+      prompt: '先检查草稿，再点击发布并验证结果。',
+    });
+    const context = mergeComposerContexts('标签页快照', command, '选中的页面元素');
+    expect(context).toContain('标签页快照');
+    expect(context).toContain('<command_instructions>');
+    expect(context).toContain('先检查草稿，再点击发布并验证结果。');
+    expect(context).toContain('选中的页面元素');
   });
 });
 
