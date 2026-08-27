@@ -4,7 +4,12 @@ import { IconEye } from '@tabler/icons-react';
 import LoadingState from '@/shared/ui/beautiful-ui/primitives/LoadingState';
 import { SettingsPanel } from '@/features/settings/SettingsPanel';
 import { useStickToBottom } from '../hooks/useStickToBottom';
-import { messagesAfter, olderRoundStartId, visibleWindow } from '../message-window';
+import {
+  messagesAfter,
+  olderRoundStartId,
+  visibleWindow,
+  visibleWindowStartId,
+} from '../message-window';
 import type { ChatMessage, TaskRow } from '@/shared/contracts/session-messages';
 import type { AgentSettings } from '@/shared/contracts/settings';
 import type { ObservedElement } from '@/shared/contracts/page';
@@ -315,7 +320,10 @@ export function AgentPanel({
           <Composer
             settings={settings}
             running={running}
-            onSubmit={onSubmit}
+            onSubmit={(prompt, context, attachedImage) => {
+              setVisibleFromId((current) => visibleWindowStartId(sourceMessages, current));
+              onSubmit(prompt, context, attachedImage);
+            }}
             onStop={onStop}
             onSettingsChange={onSettingsChange}
             imageDataUrl={imageDataUrl}

@@ -24,6 +24,13 @@ export function visibleWindow(messages: ChatMessage[], fromId?: string): ChatMes
   return messages.slice(windowStartIndex(messages, fromId));
 }
 
+export function visibleWindowStartId(
+  messages: ChatMessage[],
+  fromId?: string,
+): string | undefined {
+  return fromId ?? messages[windowStartIndex(messages)]?.id;
+}
+
 export function olderRoundStartId(messages: ChatMessage[], fromId?: string): string | undefined {
   const start = windowStartIndex(messages, fromId);
   if (start <= 0) return undefined;

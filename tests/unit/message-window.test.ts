@@ -5,6 +5,7 @@ import {
   messagesAfter,
   olderRoundStartId,
   visibleWindow,
+  visibleWindowStartId,
   windowStartIndex,
 } from '@/features/agent/ui/message-window';
 
@@ -41,6 +42,13 @@ describe('conversation rounds', () => {
   it('renders only the latest round until a fromId is set', () => {
     expect(visibleWindow(rounds).map((item) => item.id)).toEqual(['u3', 'a3']);
     expect(visibleWindow(rounds, 'u2').map((item) => item.id)).toEqual(['u2', 'a2', 'u3', 'a3']);
+  });
+
+  it('preserves the current window start before appending a new round', () => {
+    const fromId = visibleWindowStartId(rounds);
+    const appended = [...rounds, msg('u4', 'user')];
+    expect(fromId).toBe('u3');
+    expect(visibleWindow(appended, fromId).map((item) => item.id)).toEqual(['u3', 'a3', 'u4']);
   });
 
   it('walks back one round at a time when loading older messages', () => {
