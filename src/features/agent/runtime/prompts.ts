@@ -16,7 +16,33 @@ export const SYSTEM_PROMPT = `你是 Pagent，一个生活在当前浏览器标�
 排查接口失败、页面报错时，优先用 get_network_log / get_console_log；需要响应体时再用 get_network_request。这些记录只覆盖调试器 attach 之后的事件。
 `;
 
-export function buildSystemPrompt(context?: string): string {
+export const MEMORY_WRITE_RULES = [
+  '完成一个曾经兜兜转转、反复试错或踩坑的任务后，记录最终可复用的正确做法和关键避坑点。',
+  '用户纠正了事实、偏好、约束或操作方式后，记录纠正后的内容，避免以后重复犯错。',
+] as const;
+
+const MEMORY_GUIDANCE = `
+长期记忆：
+- 相关记忆会在任务开始前提供，它们是可信的长期信息；若与本轮用户的明确要求冲突，以本轮要求为准。
+- 可主动调用 memory_search 扩大查询；需要新增或修改记忆时调用 memory_write。
+- 只记录长期有用、简洁、可执行且已脱敏的信息，不保存密码、API Key、支付信息或大段网页原文。
+写入时机：
+${MEMORY_WRITE_RULES.map((rule, index) => `${index + 1}. ${rule}`).join('\n')}
+`;
+
+export function buildSystemPrompt(
+  context?: string,
+  memoryContext?: string,
+  memoryEnabled = true,
+): string {
   const extra = context?.trim();
-  return extra ? `${SYSTEM_PROMPT}\n${extra}` : SYSTEM_PROMPT;
+  const memory = memoryContext?.trim();
+  return [
+    SYSTEM_PROMPT,
+    memoryEnabled ? MEMORY_GUIDANCE : '',
+    memoryEnabled && memory
+      ? `<memory_context>\n以下是可信的长期记忆：\n${memory}\n</memory_context>`
+      : '',
+    extra ?? '',
+  ].filter(Boolean).join('\n');
 }

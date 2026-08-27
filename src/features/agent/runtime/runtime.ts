@@ -33,6 +33,7 @@ export async function runAgent(options: {
   context?: string;
   imageDataUrl?: string;
   tabId: number;
+  url?: string;
   getTabId?: () => number;
   sessionId?: string;
   conversationId?: string;
@@ -85,7 +86,7 @@ export async function runAgent(options: {
   const agent = createAgent({
     model,
     tools,
-    systemPrompt: buildSystemPrompt(options.context),
+    systemPrompt: buildSystemPrompt(options.context, undefined, settings.memory.enabled),
     middleware: [safety.middleware],
   });
   const tasks: TaskRow[] = [];

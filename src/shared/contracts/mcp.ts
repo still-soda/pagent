@@ -15,6 +15,7 @@ export const mcpServerConfigSchema = z
     headers: z.record(z.string(), z.string()).optional().describe('附加请求头，例如 Authorization'),
     transport: z.enum(MCP_TRANSPORTS).optional().describe('传输方式，默认按 URL 推断'),
     enabled: z.boolean().optional().describe('是否启用，默认启用'),
+    disabledTools: z.array(z.string()).optional().describe('不向模型暴露的 MCP 工具原始名称'),
   })
   .passthrough();
 
@@ -41,6 +42,16 @@ export type McpServerStatus = {
   status: McpServerStatusKind;
   error?: string;
   toolCount: number;
+  tools: McpToolStatus[];
+};
+
+export type McpToolStatus = {
+  /** 消毒并消除重名后的模型可见名称。 */
+  name: string;
+  /** MCP 服务器返回的原始名称，用于持久化启用状态。 */
+  originalName: string;
+  description?: string;
+  enabled: boolean;
 };
 
 /** 展示给模型的 MCP 工具元信息（name 已是消毒且唯一的展示名） */

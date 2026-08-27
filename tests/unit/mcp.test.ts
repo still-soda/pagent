@@ -1,6 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { jsonSchemaToZod } from '@/features/mcp/json-schema-to-zod';
 import { serializeMcpResult } from '@/features/mcp/serialize';
+import { mcpConfigSchema } from '@/shared/contracts/mcp';
+
+describe('mcpConfigSchema', () => {
+  it('persists per-server disabled tool names', () => {
+    const result = mcpConfigSchema.parse({
+      mcpServers: {
+        search: {
+          url: 'https://example.com/mcp',
+          disabledTools: ['delete_document'],
+        },
+      },
+    });
+    expect(result.mcpServers.search?.disabledTools).toEqual(['delete_document']);
+  });
+});
 
 describe('jsonSchemaToZod', () => {
   it('builds an object schema with required and optional fields', () => {

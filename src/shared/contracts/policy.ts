@@ -22,6 +22,22 @@ export function redactText(text: string): string {
   );
 }
 
+export function sanitizeUrl(raw: string): string {
+  try {
+    const url = new URL(raw);
+    url.username = '';
+    url.password = '';
+    for (const key of [...url.searchParams.keys()]) {
+      if (/(token|secret|password|passwd|key|auth|code|session|email)/i.test(key)) {
+        url.searchParams.set(key, '[redacted]');
+      }
+    }
+    return redactText(url.toString());
+  } catch {
+    return redactText(raw);
+  }
+}
+
 export function assertNavigableUrl(url: string, settings: AgentSettings = DEFAULT_SETTINGS): void {
   let parsed: URL;
   try {

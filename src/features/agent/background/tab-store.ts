@@ -94,7 +94,7 @@ export async function writeTabStore(
   tabId: number,
   store: PageConversationStore,
   url?: string,
-  options?: { deleteMissing?: boolean },
+  options?: { deleteMissing?: boolean; persistVault?: boolean },
 ): Promise<PageConversationStore> {
   const resolvedUrl = await resolveTabUrl(tabId, url);
   const domain = resolvedUrl ? conversationVaultKey(resolvedUrl) : tabDomains.get(tabId);
@@ -106,7 +106,7 @@ export async function writeTabStore(
   if (typeof nextStore.panelOpen === 'boolean') {
     await saveTabUi(tabId, { panelOpen: nextStore.panelOpen });
   }
-  if (domain && !isSparseStore(nextStore)) {
+  if (options?.persistVault !== false && domain && !isSparseStore(nextStore)) {
     await saveVaultFromStore(domain, nextStore, { deleteMissing: options?.deleteMissing ?? true });
   }
   return nextStore;

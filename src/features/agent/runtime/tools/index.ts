@@ -6,6 +6,7 @@ import { jsonSchemaToZod } from '@/features/mcp/json-schema-to-zod';
 import { safeJson, truncate } from '@/shared/utils/utils';
 import type { AgentSettings } from '@/shared/contracts/settings';
 import type { McpToolMeta } from '@/shared/contracts/mcp';
+import type { MemoryScope } from '@/shared/contracts/memory';
 
 export type ToolBridge = {
   tabId: number;
@@ -45,6 +46,10 @@ export type ToolBridge = {
     listTools: () => Promise<McpToolMeta[]>;
     callTool: (name: string, args: unknown) => Promise<string>;
   };
+  memory: {
+    search: (query: string, limit?: number) => Promise<unknown>;
+    write: (content: string, scope: MemoryScope, memoryId?: string) => Promise<unknown>;
+  };
 };
 
 /** 内置工具名集合，MCP 工具展示名与其冲突时自动加服务器前缀 */
@@ -79,6 +84,8 @@ export const BUILTIN_TOOL_NAMES: ReadonlySet<string> = new Set([
   'get_network_log',
   'get_console_log',
   'get_network_request',
+  'memory_search',
+  'memory_write',
 ]);
 
 export async function createAgentTools(bridge: ToolBridge) {
@@ -483,7 +490,35 @@ export async function createAgentTools(bridge: ToolBridge) {
     },
   );
 
-  return [
+  const memorySearch = tool(
+    async ({ query, limit }) => safeJson(await bridge.memory.search(query, limit)),
+    {
+      name: 'memory_search',
+      description:
+        '主动检索与当前任务相关的长期记忆。会同时搜索全局记忆和当前域名的局部记忆，返回记忆 ID 供后续修改。',
+      schema: z.object({
+        query: z.string().min(1).max(4000),
+        limit: z.number().int().min(1).max(20).optional(),
+      }),
+    },
+  );
+
+  const memoryWrite = tool(
+    async ({ content, scope, memoryId }) =>
+      safeJson(await bridge.memory.write(content, scope, memoryId)),
+    {
+      name: 'memory_write',
+      description:
+        '写入长期记忆。scope=global 适用于跨网站经验，scope=local 仅用于当前域名并自动记录脱敏 URL。传 memoryId 可修改已有记忆。',
+      schema: z.object({
+        content: z.string().min(1).max(8000),
+        scope: z.enum(['global', 'local']),
+        memoryId: z.string().optional().describe('修改 memory_search 返回的已有记忆 ID'),
+      }),
+    },
+  );
+
+  const builtinTools = [
     observe,
     search,
     screenshot,
@@ -514,6 +549,11 @@ export async function createAgentTools(bridge: ToolBridge) {
     networkLog,
     consoleLog,
     networkRequest,
+    ...(bridge.settings.memory.enabled ? [memorySearch, memoryWrite] : []),
+  ];
+  const disabledBuiltinTools = new Set(bridge.settings.disabledBuiltinTools ?? []);
+  return [
+    ...builtinTools.filter((builtinTool) => !disabledBuiltinTools.has(builtinTool.name)),
     ...(await createMcpAgentTools(bridge)),
   ];
 }

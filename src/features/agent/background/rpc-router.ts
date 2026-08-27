@@ -7,6 +7,9 @@ import {
   saveSecret,
   saveSettings,
   secretPresence,
+  loadMemorySecret,
+  saveMemorySecret,
+  clearMemorySecret,
   loadTabUi,
   saveTabUi,
   saveVaultFromStore,
@@ -64,6 +67,12 @@ import {
 } from './agent-controller';
 import { sendToContent, snapshotMentionedTab, togglePanel } from './content-bridge';
 import { archiveTabNavigation, readTabStore, resolveTabUrl, tabDomains, tabStores, writeTabStore } from './tab-store';
+import {
+  memoryViewsForPage,
+  removeMemory,
+  testMemoryConnection,
+  updateMemoryContent,
+} from '@/features/memory/service';
 
 const PERMANENTLY_HIDDEN_KEY = 'pagent:permanently-hidden';
 
@@ -212,6 +221,29 @@ export async function handleRpc(name: RpcName, payload: unknown, senderTabId?: n
       });
       return testModelConnection(next, await loadSecrets());
     }
+    case 'memory.list':
+      return memoryViewsForPage(await resolveTabUrl(tabId));
+    case 'memory.update': {
+      const data = parseRpcPayload('memory.update', payload);
+      return updateMemoryContent(data.id, data.content, await resolveTabUrl(tabId));
+    }
+    case 'memory.delete': {
+      const data = parseRpcPayload('memory.delete', payload);
+      await removeMemory(data.id, await resolveTabUrl(tabId));
+      return { ok: true };
+    }
+    case 'memory.secret.set': {
+      const data = parseRpcPayload('memory.secret.set', payload);
+      await saveMemorySecret(data.apiKey.trim());
+      return { ok: true };
+    }
+    case 'memory.secret.clear':
+      await clearMemorySecret();
+      return { ok: true };
+    case 'memory.secret.has':
+      return { present: Boolean(await loadMemorySecret()) };
+    case 'memory.test':
+      return testMemoryConnection();
     case 'agent.start': {
       const data = parseRpcPayload('agent.start', payload);
       return startAgent(
@@ -275,13 +307,17 @@ export async function handleRpc(name: RpcName, payload: unknown, senderTabId?: n
       ) {
         control.store = incoming;
       }
+      let vaultSaved = false;
       if (senderDomain && !isSparseStore(incoming)) {
         await saveVaultFromStore(senderDomain, incoming, {
           deleteMissing: !currentDomain || currentDomain === senderDomain,
         });
+        vaultSaved = true;
       }
       if (!currentDomain || !senderDomain || currentDomain === senderDomain) {
-        await writeTabStore(tabId, incoming, senderUrl ?? currentUrl);
+        await writeTabStore(tabId, incoming, senderUrl ?? currentUrl, {
+          persistVault: !vaultSaved,
+        });
       }
       return { ok: true };
     }

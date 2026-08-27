@@ -11,6 +11,7 @@ import { Textarea } from '@/shared/ui/textarea';
 import { rpc } from '@/shared/extension/rpc-client';
 import { requestPermissions } from '@/shared/browser/permissions';
 import { mcpConfigSchema, type McpState, type McpServerStatusKind } from '@/shared/contracts/mcp';
+import { BUILTIN_TOOL_DISPLAY } from '@/features/agent/session/tool-display';
 import {
   DEFAULT_SETTINGS,
   PROVIDER_IDS,
@@ -26,6 +27,7 @@ import {
   type PermissionState,
   type ProviderId,
 } from '@/shared/contracts/settings';
+import { MemorySettingsSection } from './MemorySettingsSection';
 
 async function requestOptionalPermissions(options: {
   debugger?: boolean;
@@ -90,6 +92,7 @@ export function SettingsPanel({
   const [mcpError, setMcpError] = useState('');
   const [mcpBusy, setMcpBusy] = useState(false);
   const [mcpOpen, setMcpOpen] = useState(false);
+  const [mcpToolsOpen, setMcpToolsOpen] = useState(false);
   const [remoteModels, setRemoteModels] = useState<Partial<Record<ProviderId, CatalogModel[]>>>({});
   const [fetchingModels, setFetchingModels] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -147,6 +150,43 @@ export function SettingsPanel({
     } finally {
       setMcpBusy(false);
     }
+  };
+
+  const setMcpToolEnabled = async (serverName: string, toolName: string, enabled: boolean) => {
+    if (!mcpState) return;
+    const server = mcpState.config.mcpServers[serverName];
+    if (!server) return;
+    const disabledTools = new Set(server.disabledTools ?? []);
+    if (enabled) disabledTools.delete(toolName);
+    else disabledTools.add(toolName);
+    const config = {
+      ...mcpState.config,
+      mcpServers: {
+        ...mcpState.config.mcpServers,
+        [serverName]: {
+          ...server,
+          disabledTools: [...disabledTools],
+        },
+      },
+    };
+    setMcpBusy(true);
+    setMcpError('');
+    try {
+      const state = (await rpc('mcp.setConfig', { config })) as McpState;
+      setMcpState(state);
+      setMcpJson(JSON.stringify(state.config, null, 2));
+    } catch (error) {
+      setMcpError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setMcpBusy(false);
+    }
+  };
+
+  const setBuiltinToolEnabled = (toolName: string, enabled: boolean) => {
+    const disabledTools = new Set(settings.disabledBuiltinTools ?? []);
+    if (enabled) disabledTools.delete(toolName);
+    else disabledTools.add(toolName);
+    void patch({ disabledBuiltinTools: [...disabledTools] });
   };
 
   useEffect(() => {
@@ -450,6 +490,8 @@ export function SettingsPanel({
         />
       </section>
 
+      <MemorySettingsSection settings={settings} onPatch={patch} />
+
       <BouncyAccordion
         value={mcpOpen ? 'mcp' : null}
         onValueChange={(value) => setMcpOpen(value === 'mcp')}
@@ -522,6 +564,83 @@ export function SettingsPanel({
                     ))}
                   </ul>
                 )}
+              </div>
+            ),
+          },
+        ]}
+      />
+
+      <BouncyAccordion
+        value={mcpToolsOpen ? 'mcp-tools' : null}
+        onValueChange={(value) => setMcpToolsOpen(value === 'mcp-tools')}
+        items={[
+          {
+            id: 'mcp-tools',
+            title: 'MCP 工具',
+            description: (
+              <div className="space-y-2.5">
+                <p className="text-[12.5px] leading-5 text-ink-2">
+                  控制提供给模型的内置和 MCP 工具。关闭后，模型将无法看到或调用该工具。
+                </p>
+                <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
+                  <div className="space-y-1">
+                    <p className="sticky top-0 z-10 bg-card px-1 py-1 text-[11px] font-medium tracking-wide text-ink-3">
+                      内置工具
+                    </p>
+                    {BUILTIN_TOOL_DISPLAY.map((tool) => (
+                      <div
+                        key={tool.name}
+                        className="flex items-center gap-2 rounded-[8px] bg-inset px-2 py-1.5 text-[12.5px] leading-5"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium text-ink">{tool.label}</span>
+                          <span className="block truncate text-ink-3">{tool.name}</span>
+                        </span>
+                        <Switch
+                          checked={!(settings.disabledBuiltinTools ?? []).includes(tool.name)}
+                          onCheckedChange={(enabled) => setBuiltinToolEnabled(tool.name, enabled)}
+                          aria-label={`启用内置工具 ${tool.label}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="space-y-1">
+                    <p className="sticky top-0 z-10 bg-card px-1 py-1 text-[11px] font-medium tracking-wide text-ink-3">
+                      MCP 工具
+                    </p>
+                    {mcpState?.servers.some((server) => server.tools.length > 0) ? (
+                      mcpState.servers.flatMap((server) =>
+                        server.tools.map((tool) => (
+                          <div
+                            key={`${server.name}:${tool.originalName}`}
+                            className="flex items-center gap-2 rounded-[8px] bg-inset px-2 py-1.5 text-[12.5px] leading-5"
+                          >
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-medium text-ink">{tool.name}</span>
+                            <span className="block truncate text-ink-3">
+                              {server.name}
+                              {tool.description ? ` · ${tool.description}` : ''}
+                            </span>
+                          </span>
+                            <Switch
+                              checked={tool.enabled}
+                              disabled={mcpBusy}
+                              onCheckedChange={(enabled) =>
+                                void setMcpToolEnabled(server.name, tool.originalName, enabled)
+                              }
+                              aria-label={`启用 MCP 工具 ${tool.name}`}
+                            />
+                          </div>
+                        )),
+                      )
+                    ) : (
+                      <p className="rounded-[8px] bg-inset px-2 py-2 text-[12.5px] text-ink-3">
+                        暂无可用工具，请先连接 MCP 服务器。
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {mcpError && <p role="alert" className="text-[12.5px] leading-5 text-red">{mcpError}</p>}
               </div>
             ),
           },

@@ -3,6 +3,11 @@ import { API_PROTOCOLS, PROVIDER_IDS } from './settings';
 import { NAMED_SCRIPTS, SOURCE_TYPES } from './page';
 import { mcpConfigSchema } from './mcp';
 import { CHANNEL } from './channel';
+import {
+  memoryDeletePayloadSchema,
+  memoryListPayloadSchema,
+  memoryUpdatePayloadSchema,
+} from './memory';
 
 export { CHANNEL } from './channel';
 
@@ -180,6 +185,13 @@ export const rpcSchemas = {
   'secrets.has': z.object({}),
   'models.list': modelsListPayloadSchema,
   'llm.test': llmTestPayloadSchema,
+  'memory.list': memoryListPayloadSchema,
+  'memory.update': memoryUpdatePayloadSchema,
+  'memory.delete': memoryDeletePayloadSchema,
+  'memory.secret.set': z.object({ apiKey: z.string().min(1) }),
+  'memory.secret.clear': z.object({}),
+  'memory.secret.has': z.object({}),
+  'memory.test': z.object({}),
   'agent.start': z.object({
     prompt: z.string().min(1),
     context: z.string().optional(),

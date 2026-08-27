@@ -26,6 +26,7 @@ import { captureVisibleTab, trimDataUrl } from '@/shared/browser/screenshot';
 import { callMcpTool, listMcpTools } from '@/features/mcp/background/mcp-manager';
 import type { AgentSettings } from '@/shared/contracts/settings';
 import type { AgentControl } from './agent-controller';
+import { queryMemory, writeMemory } from '@/features/memory/service';
 
 const CONTENT_FILE = '/content-scripts/content.js';
 
@@ -104,6 +105,7 @@ export function createBridge(
   retargetAgent: (fromTabId: number, toTabId: number) => Promise<void>,
 ) {
   const tabId = () => control.tabId;
+  const currentUrl = async () => (await browser.tabs.get(tabId())).url;
   return {
     get tabId() {
       return tabId();
@@ -153,6 +155,11 @@ export function createBridge(
     mcp: {
       listTools: listMcpTools,
       callTool: (name: string, args: unknown) => callMcpTool(name, args),
+    },
+    memory: {
+      search: async (query: string, limit?: number) => queryMemory(query, await currentUrl(), limit),
+      write: async (content: string, scope: 'global' | 'local', memoryId?: string) =>
+        writeMemory({ content, scope, memoryId, url: await currentUrl() }),
     },
   };
 }

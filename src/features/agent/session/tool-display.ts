@@ -57,7 +57,14 @@ const TOOLS: Record<string, ToolMeta> = {
   get_network_log: { label: '查看网络请求', kind: 'network' },
   get_console_log: { label: '查看控制台', kind: 'network' },
   get_network_request: { label: '查看请求详情', kind: 'network' },
+  memory_search: { label: '查询记忆', kind: 'read' },
+  memory_write: { label: '写入记忆', kind: 'read' },
 };
+
+export const BUILTIN_TOOL_DISPLAY = Object.entries(TOOLS).map(([name, meta]) => ({
+  name,
+  label: meta.label,
+}));
 
 const STATUS_LABELS: Record<string, string> = {
   pending: '准备中',
@@ -178,6 +185,14 @@ export function toolChip(name: string, args?: unknown, status?: string): string 
       return text(fields.level) ? `${text(fields.level)} 级别` : '最近的日志';
     case 'get_network_request':
       return text(fields.requestId) ? truncate(text(fields.requestId), 22) : '单条请求';
+    case 'memory_search':
+      return text(fields.query) ? `检索「${truncate(text(fields.query), 24)}」` : '检索相关记忆';
+    case 'memory_write':
+      return text(fields.memoryId)
+        ? `修改 ${truncate(text(fields.memoryId), 18)}`
+        : fields.scope === 'local'
+          ? '保存为局部记忆'
+          : '保存为全局记忆';
     default:
       return fallback;
   }

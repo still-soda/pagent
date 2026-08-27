@@ -94,10 +94,11 @@ export async function startAgent(
 ) {
   stopAgent(tabId);
   const abort = new AbortController();
+  const currentUrl = await resolveTabUrl(tabId);
   const existing =
     tabStores.get(tabId) ??
     (await readTabStore(tabId)) ??
-    createPageStore(conversationVaultKey((await resolveTabUrl(tabId)) ?? '') ?? undefined);
+    createPageStore(conversationVaultKey(currentUrl ?? '') ?? undefined);
   const targetId = conversationId ?? existing.activeId;
   let conversations = existing.conversations;
   let target = conversations.find((item) => item.id === targetId);
@@ -155,6 +156,7 @@ export async function startAgent(
     prompt,
     context,
     tabId,
+    url: currentUrl,
     getTabId: () => control.tabId,
     sessionId,
     conversationId: targetId,

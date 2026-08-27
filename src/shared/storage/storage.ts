@@ -55,6 +55,10 @@ export const persistedSecretsItem = storage.defineItem<SecretMap>('local:pagent-
   fallback: {},
 });
 
+export const memorySecretItem = storage.defineItem<string>('local:pagent-memory-secret', {
+  fallback: '',
+});
+
 const pageConversationsItem = storage.defineItem<Record<string, PageConversationStore>>(
   'session:pagent-page-conversations',
   { fallback: {} },
@@ -258,6 +262,7 @@ export async function loadSettings(): Promise<AgentSettings> {
     ...DEFAULT_SETTINGS,
     ...stored,
     model: { ...DEFAULT_SETTINGS.model, ...stored.model },
+    memory: { ...DEFAULT_SETTINGS.memory, ...stored.memory },
   };
   // @langchain/openai 1.5 only recognizes OpenAI reasoning-summary events,
   // while DeepSeek Responses streams response.reasoning_text.delta.
@@ -274,6 +279,7 @@ export async function saveSettings(patch: Partial<AgentSettings>): Promise<Agent
     ...current,
     ...patch,
     model: { ...current.model, ...patch.model },
+    memory: { ...current.memory, ...patch.memory },
   };
   await settingsItem.setValue(next);
   return next;
@@ -330,6 +336,18 @@ export async function clearSecrets(provider?: keyof SecretMap): Promise<void> {
 export async function secretPresence(): Promise<Record<string, boolean>> {
   const secrets = await loadSecrets();
   return Object.fromEntries(PROVIDER_IDS.map((id) => [id, Boolean(secrets[id])]));
+}
+
+export async function loadMemorySecret(): Promise<string> {
+  return memorySecretItem.getValue();
+}
+
+export async function saveMemorySecret(apiKey: string): Promise<void> {
+  await memorySecretItem.setValue(apiKey);
+}
+
+export async function clearMemorySecret(): Promise<void> {
+  await memorySecretItem.setValue('');
 }
 
 export function resetSessionReadyForTests(): void {

@@ -1,5 +1,5 @@
 import { PAGE_NAVIGATION_EVENT } from '@/features/page/navigation';
-import { redactText } from '@/shared/contracts/policy';
+import { redactText, sanitizeUrl } from '@/shared/contracts/policy';
 import type { RecordedAction, RecordedActionKind, RecordedTarget } from '@/shared/contracts/teaching';
 
 type Emit = (actions: RecordedAction[]) => void;
@@ -9,19 +9,7 @@ function id(): string {
 }
 
 export function sanitizeRecordedUrl(raw: string): string {
-  try {
-    const url = new URL(raw);
-    url.username = '';
-    url.password = '';
-    for (const key of [...url.searchParams.keys()]) {
-      if (/(token|secret|password|passwd|key|auth|code|session|email)/i.test(key)) {
-        url.searchParams.set(key, '[redacted]');
-      }
-    }
-    return url.toString();
-  } catch {
-    return redactText(raw);
-  }
+  return sanitizeUrl(raw);
 }
 
 function fromPagentUi(event: Event): boolean {

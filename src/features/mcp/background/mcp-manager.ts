@@ -195,19 +195,26 @@ export async function getMcpState(): Promise<McpState> {
   for (const [name, entry] of Object.entries(config.mcpServers)) {
     const live = servers.get(name);
     if (entry.enabled === false) {
-      statuses.push({ name, url: entry.url, status: 'disabled', toolCount: 0 });
+      statuses.push({ name, url: entry.url, status: 'disabled', toolCount: 0, tools: [] });
       continue;
     }
     if (!live) {
-      statuses.push({ name, url: entry.url, status: 'disconnected', toolCount: 0 });
+      statuses.push({ name, url: entry.url, status: 'disconnected', toolCount: 0, tools: [] });
       continue;
     }
+    const disabledTools = new Set(entry.disabledTools ?? []);
     statuses.push({
       name,
       url: live.url,
       status: live.status,
       error: live.error,
       toolCount: live.tools.length,
+      tools: live.tools.map((tool) => ({
+        name: tool.name,
+        originalName: tool.tool,
+        description: tool.description,
+        enabled: !disabledTools.has(tool.tool),
+      })),
     });
   }
   return { config, servers: statuses };
@@ -223,10 +230,13 @@ async function ensureMcpReady(): Promise<void> {
 
 export async function listMcpTools(): Promise<McpToolMeta[]> {
   await ensureMcpReady();
+  const config = await loadMcpConfig();
   const out: McpToolMeta[] = [];
   for (const live of servers.values()) {
     if (live.status !== 'connected') continue;
+    const disabledTools = new Set(config.mcpServers[live.name]?.disabledTools ?? []);
     for (const tool of live.tools) {
+      if (disabledTools.has(tool.tool)) continue;
       out.push({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema });
     }
   }
@@ -239,6 +249,10 @@ export async function callMcpTool(displayName: string, args: unknown): Promise<s
   const live = servers.get(ref.server);
   if (!live || live.status !== 'connected') {
     throw new Error(`MCP 服务器 ${ref.server} 未连接`);
+  }
+  const config = await loadMcpConfig();
+  if (config.mcpServers[ref.server]?.disabledTools?.includes(ref.tool)) {
+    throw new Error(`MCP 工具已禁用：${displayName}`);
   }
   const result = await live.client.callTool({
     name: ref.tool,

@@ -21,6 +21,15 @@ export type ApiProtocol = (typeof API_PROTOCOLS)[number];
 
 export type ExecutionMode = 'dom' | 'cdp';
 
+export type MemorySettings = {
+  enabled: boolean;
+  provider: 'jina' | 'custom';
+  embeddingEndpoint: string;
+  embeddingModel: string;
+  rerankerEndpoint: string;
+  rerankerModel: string;
+};
+
 export type ModelSettings = {
   provider: ProviderId;
   model: string;
@@ -265,11 +274,13 @@ export function resolveModelList(base: CatalogModel[], remote?: CatalogModel[]):
 
 export type AgentSettings = {
   model: ModelSettings;
+  memory: MemorySettings;
   executionMode: ExecutionMode;
   allowCdpScript: boolean;
   allowCrossOrigin: boolean;
   captureScreenshots: boolean;
   captureDevtools: boolean;
+  disabledBuiltinTools: string[];
   maxModelCalls: number;
   maxToolCalls: number;
   maxDurationMs: number;
@@ -292,11 +303,20 @@ export const DEFAULT_SETTINGS: AgentSettings = {
     apiProtocol: 'chat-completions',
     persistKey: true,
   },
+  memory: {
+    enabled: true,
+    provider: 'jina',
+    embeddingEndpoint: 'https://api.jina.ai/v1/embeddings',
+    embeddingModel: 'jina-embeddings-v5-text-small',
+    rerankerEndpoint: 'https://api.jina.ai/v1/rerank',
+    rerankerModel: 'jina-reranker-v3.5',
+  },
   executionMode: 'dom',
   allowCdpScript: false,
   allowCrossOrigin: false,
   captureScreenshots: true,
   captureDevtools: true,
+  disabledBuiltinTools: [],
   maxModelCalls: 24,
   maxToolCalls: 40,
   maxDurationMs: 8 * 60 * 1000,
