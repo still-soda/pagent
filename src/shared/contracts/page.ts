@@ -19,10 +19,6 @@ export type ObservedElement = {
   disabled?: boolean;
   checked?: boolean;
   box?: PageBox;
-  /** 通过 addEventListener 登记过且仍生效的事件类型（页面主世界 document_start 注入追踪） */
-  listenerEvents?: string[];
-  /** 元素携带的内联事件属性对应的事件类型（如 onclick → ['click']） */
-  inlineHandlers?: string[];
 };
 
 export type PageObservation = {
