@@ -465,6 +465,11 @@ export function SettingsPanel({
           onCheckedChange={(captureScreenshots) => void patch({ captureScreenshots })}
         />
         <SettingRow
+          label="截图以图片形式传给模型（需模型支持视觉）"
+          checked={settings.screenshotAsImage}
+          onCheckedChange={(screenshotAsImage) => void patch({ screenshotAsImage })}
+        />
+        <SettingRow
           label="采集网络请求和控制台日志"
           checked={settings.captureDevtools}
           onCheckedChange={(enabled) => {

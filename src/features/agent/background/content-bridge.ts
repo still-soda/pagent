@@ -121,11 +121,15 @@ export function createBridge(
     },
     settings,
     content: <T,>(name: string, payload?: unknown) => sendToContent<T>(tabId(), name, payload),
-    screenshot: async (fullPage?: boolean) =>
+    screenshot: async (fullPage?: boolean, raw?: boolean) =>
       captureWithHiddenPanel(async (targetTabId) => {
-        if (fullPage) return trimDataUrl(await captureCdpScreenshot(targetTabId, true));
+        if (fullPage) {
+          const data = await captureCdpScreenshot(targetTabId, true);
+          return raw ? data : trimDataUrl(data);
+        }
         const tab = await browser.tabs.get(targetTabId);
-        return trimDataUrl(await captureVisibleTab(tab.windowId));
+        const data = await captureVisibleTab(tab.windowId);
+        return raw ? data : trimDataUrl(data);
       }),
     navigate: (url: string) => navigateTab(tabId(), url),
     back: () => goBack(tabId()),
@@ -155,10 +159,11 @@ export function createBridge(
         if (payload.text) await insertText(tabId(), payload.text);
         return { ok: true };
       },
-      screenshot: async (fullPage?: boolean) =>
-        captureWithHiddenPanel(async (targetTabId) =>
-          trimDataUrl(await captureCdpScreenshot(targetTabId, Boolean(fullPage))),
-        ),
+      screenshot: async (fullPage?: boolean, raw?: boolean) =>
+        captureWithHiddenPanel(async (targetTabId) => {
+          const data = await captureCdpScreenshot(targetTabId, Boolean(fullPage));
+          return raw ? data : trimDataUrl(data);
+        }),
       network: (filter?: Parameters<typeof getNetworkLog>[1]) => getNetworkLog(tabId(), filter),
       console: (filter?: Parameters<typeof getConsoleLog>[1]) => getConsoleLog(tabId(), filter),
       request: (requestId: string, includeBody?: boolean) =>

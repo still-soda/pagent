@@ -12,7 +12,8 @@ export type ToolBridge = {
   tabId: number;
   settings: AgentSettings;
   content: <T>(name: string, payload?: unknown) => Promise<T>;
-  screenshot: (fullPage?: boolean) => Promise<string>;
+  /** raw=true 时返回完整未截断的 data URL（供作为图片传给模型） */
+  screenshot: (fullPage?: boolean, raw?: boolean) => Promise<string>;
   navigate: (url: string) => Promise<unknown>;
   back: () => Promise<unknown>;
   forward: () => Promise<unknown>;
@@ -26,7 +27,7 @@ export type ToolBridge = {
   cdp: {
     script: (expression: string, awaitPromise?: boolean) => Promise<unknown>;
     input: (payload: { x: number; y: number; type?: string; text?: string }) => Promise<unknown>;
-    screenshot: (fullPage?: boolean) => Promise<string>;
+    screenshot: (fullPage?: boolean, raw?: boolean) => Promise<string>;
     network: (filter?: {
       urlIncludes?: string;
       method?: string;
@@ -124,14 +125,21 @@ export async function createAgentTools(bridge: ToolBridge) {
   const screenshot = tool(
     async ({ fullPage }) => {
       if (!bridge.settings.captureScreenshots) return '用户已关闭截图。';
-      if (bridge.settings.executionMode === 'cdp') {
-        return await bridge.cdp.screenshot(fullPage);
-      }
-      return await bridge.screenshot(fullPage);
+      // 以图片形式传给模型时取完整（未截断）data URL；否则沿用旧的截断文本返回
+      const raw = bridge.settings.screenshotAsImage;
+      const dataUrl =
+        bridge.settings.executionMode === 'cdp'
+          ? await bridge.cdp.screenshot(fullPage, raw)
+          : await bridge.screenshot(fullPage, raw);
+      if (!bridge.settings.screenshotAsImage) return dataUrl;
+      return [
+        { type: 'text', text: '截图完成（图片已随本结果提供，可直接查看）。' },
+        { type: 'image_url', image_url: { url: dataUrl } },
+      ];
     },
     {
       name: 'capture_screenshot',
-      description: '截取当前标签页可见区域或整页截图，返回 data URL。',
+      description: '截取当前标签页可见区域或整页截图，以图片形式返回（模型可直接查看截图内容）。',
       schema: z.object({ fullPage: z.boolean().optional() }),
     },
   );

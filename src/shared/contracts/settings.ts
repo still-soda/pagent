@@ -279,6 +279,8 @@ export type AgentSettings = {
   allowCdpScript: boolean;
   allowCrossOrigin: boolean;
   captureScreenshots: boolean;
+  /** 截图以真实图片（image_url 内容块）传给模型，而不是 base64 文本；需要模型支持视觉 */
+  screenshotAsImage: boolean;
   captureDevtools: boolean;
   disabledBuiltinTools: string[];
   maxModelCalls: number;
@@ -315,6 +317,7 @@ export const DEFAULT_SETTINGS: AgentSettings = {
   allowCdpScript: false,
   allowCrossOrigin: false,
   captureScreenshots: true,
+  screenshotAsImage: true,
   captureDevtools: true,
   disabledBuiltinTools: [],
   maxModelCalls: 24,
