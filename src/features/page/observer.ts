@@ -2,6 +2,7 @@ import { nowId, truncate } from '@/shared/utils/utils';
 import { redactText } from '@/shared/contracts/policy';
 import type { ObservedElement, PageObservation } from '@/shared/contracts/page';
 import { getRememberedSelection } from './selection';
+import { LISTENER_ATTR, listenerEventsOf } from './listener-tracker';
 
 const INTERACTIVE = [
   'a',
@@ -68,14 +69,27 @@ export class PageObserver {
     const elements: ObservedElement[] = [];
     const seen = new Set<Element>();
     const candidates = Array.from(root.querySelectorAll(INTERACTIVE));
+    // 登记过 addEventListener 的元素（document_start 主世界追踪器标记）与携带 onclick 的元素，仅取可见部分
+    const listenerCandidates = Array.from(root.querySelectorAll(`[${LISTENER_ATTR}]`));
+    const onclickCandidates = Array.from(root.querySelectorAll('[onclick]'));
 
-    for (const el of candidates) {
-      if (seen.has(el) || el.closest(SKIP)) continue;
-      seen.add(el);
-      const record = this.serialize(el);
-      if (!record) continue;
-      elements.push(record);
-      if (elements.length >= maxElements) break;
+    const groups: Array<{ els: Element[]; visibleOnly: boolean }> = [
+      { els: candidates, visibleOnly: false },
+      { els: listenerCandidates, visibleOnly: true },
+      { els: onclickCandidates, visibleOnly: true },
+    ];
+
+    scan: for (const group of groups) {
+      for (const el of group.els) {
+        if (seen.has(el) || el.closest(SKIP)) continue;
+        if (group.visibleOnly && (el.tagName === 'HTML' || el.tagName === 'BODY')) continue;
+        seen.add(el);
+        const record = this.serialize(el);
+        if (!record) continue;
+        if (group.visibleOnly && !record.visible) continue;
+        elements.push(record);
+        if (elements.length >= maxElements) break scan;
+      }
     }
 
     if (elements.length < maxElements) {
@@ -133,6 +147,10 @@ export class PageObserver {
         '',
     );
 
+    const listenerEvents = listenerEventsOf(el);
+    const inlineHandlers = el.hasAttribute('onclick') ? ['click'] : [];
+    const hasClickHandler = listenerEvents.includes('click') || inlineHandlers.includes('click');
+
     return {
       id,
       tag: el.tagName.toLowerCase(),
@@ -143,7 +161,7 @@ export class PageObserver {
       href: html instanceof HTMLAnchorElement ? html.href : undefined,
       placeholder: html.getAttribute('placeholder') ?? undefined,
       visible,
-      clickable: html.tabIndex >= 0 || /^(a|button|input|select|textarea)$/i.test(el.tagName),
+      clickable: html.tabIndex >= 0 || /^(a|button|input|select|textarea)$/i.test(el.tagName) || hasClickHandler,
       disabled: 'disabled' in html ? Boolean((html as HTMLInputElement).disabled) : undefined,
       checked: 'checked' in html ? Boolean((html as HTMLInputElement).checked) : undefined,
       box: {
@@ -152,6 +170,8 @@ export class PageObserver {
         width: Math.round(rect.width),
         height: Math.round(rect.height),
       },
+      listenerEvents: listenerEvents.length > 0 ? listenerEvents : undefined,
+      inlineHandlers: inlineHandlers.length > 0 ? inlineHandlers : undefined,
     };
   }
 
