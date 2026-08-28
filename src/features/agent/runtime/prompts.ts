@@ -28,6 +28,13 @@ export const SYSTEM_PROMPT = `
 </agent_profile>
 `;
 
+/** 记忆写入规则，按条渲染进 <write_rules>，便于单独断言与扩展 */
+export const MEMORY_WRITE_RULES = [
+  '需要新增或修改记忆时调用 memory_write。',
+  'memory_write 每次只保存一组 QA：“Q: 一个完整问题”后接“A: 可复用的答案或经验”。需要记录多个问题时，分别调用多次 memory_write，创建多条独立记忆，禁止把多组 QA 合并到一条记忆。',
+  '只记录长期有用、简洁、可执行且已脱敏的信息，不保存密码、API Key、支付信息或大段网页原文。',
+] as const;
+
 const MEMORY_GUIDANCE = `
 <memory_guidance priority="extremely_critical">
   <critical_rules>
@@ -41,9 +48,7 @@ const MEMORY_GUIDANCE = `
     <rule>可主动调用 memory_search 扩大查询。</rule>
   </retrieval_rules>
   <write_rules>
-    <rule>需要新增或修改记忆时调用 memory_write。</rule>
-    <rule>memory_write 每次只保存一组 QA：“Q: 一个完整问题”后接“A: 可复用的答案或经验”。需要记录多个问题时，分别调用多次 memory_write，创建多条独立记忆，禁止把多组 QA 合并到一条记忆。</rule>
-    <rule>只记录长期有用、简洁、可执行且已脱敏的信息，不保存密码、API Key、支付信息或大段网页原文。</rule>
+${MEMORY_WRITE_RULES.map((rule) => `    <rule>${rule}</rule>`).join('\n')}
   </write_rules>
   <task_optimization_rules>
     <rule>对于 DOM 操作，优先使用浏览器 API 直接执行，减少通过 UI 操作完成。</rule>
