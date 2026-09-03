@@ -82,6 +82,8 @@ export async function handleRpc(name: RpcName, payload: unknown, senderTabId?: n
 
   switch (name) {
     case 'dom.observe':
+    case 'dom.changes.start':
+    case 'dom.changes.read':
     case 'dom.search':
     case 'dom.click':
     case 'dom.dblclick':

@@ -18,6 +18,10 @@ import { getRememberedSelection } from './selection';
 import { searchPageText } from './search';
 import { getPageSource } from './source';
 import type { NamedScript, SourceType } from '@/shared/contracts/page';
+import {
+  pageChangeTracker,
+  type PageChangeSnapshot,
+} from './change-tracker';
 
 export function handleContentCommand(name: string, payload: Record<string, unknown>) {
   switch (name) {
@@ -29,6 +33,14 @@ export function handleContentCommand(name: string, payload: Record<string, unkno
       return { ok: true, uiCommand: name };
     case 'dom.observe':
       return pageObserver.observe(document, Number(payload.maxElements ?? 140));
+    case 'dom.changes.start':
+      return pageChangeTracker.snapshot(Number(payload.maxNodes ?? 400));
+    case 'dom.changes.read':
+      return pageChangeTracker.read(payload.baseline as PageChangeSnapshot, {
+        timeoutMs: payload.timeoutMs as number | undefined,
+        quietMs: payload.quietMs as number | undefined,
+        maxChanges: payload.maxChanges as number | undefined,
+      });
     case 'dom.search':
       return searchPageText(String(payload.query ?? ''), {
         caseSensitive: Boolean(payload.caseSensitive),

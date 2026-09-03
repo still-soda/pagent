@@ -13,6 +13,7 @@ import { isTogglePanelHotkey } from '@/shared/extension/hotkey';
 import { installPageNavigationEvents, PAGE_NAVIGATION_EVENT } from '@/features/page/navigation';
 import { handleContentCommand } from '@/features/page/content-command-handler';
 import { dispatchUiCommand, type UiCommand, uiEvents } from '@/features/page/ui-events';
+import { pageChangeTracker } from '@/features/page/change-tracker';
 
 function persistPanelOpen(open: boolean) {
   void rpc('session.setUi', { panelOpen: open });
@@ -152,6 +153,7 @@ export default defineContentScript({
 
     installPageSelectionTracker();
     installPageNavigationEvents();
+    pageChangeTracker.install();
 
     const ui = await createShadowRootUi(ctx, {
       name: 'pagent-root',

@@ -28,6 +28,7 @@ const NAMED_SCRIPTS: Record<string, string> = {
 
 const TOOLS: Record<string, ToolMeta> = {
   observe_page: { label: '观察页面', kind: 'observe' },
+  observe_page_changes: { label: '观察页面变化', kind: 'observe' },
   search_page_text: { label: '搜索页面', kind: 'search' },
   capture_screenshot: { label: '截取屏幕', kind: 'read' },
   click_element: { label: '点击', kind: 'click' },
@@ -110,6 +111,8 @@ export function toolChip(name: string, args?: unknown, status?: string): string 
   switch (name) {
     case 'observe_page':
       return text(fields.reason) || '查看当前页面';
+    case 'observe_page_changes':
+      return fields.action === 'start' ? '开始记录变化' : '检查操作结果';
     case 'search_page_text':
       return text(fields.query) ? `查找「${truncate(text(fields.query), 24)}」` : '全文查找';
     case 'capture_screenshot':

@@ -21,6 +21,33 @@ export const observePayloadSchema = z.object({
   maxElements: z.number().int().min(1).max(400).optional(),
 });
 
+export const changeSnapshotSchema = z.object({
+  watchId: z.string(),
+  documentId: z.string(),
+  cursor: z.number().int().nonnegative(),
+  mutationCount: z.number().int().nonnegative(),
+  maxNodes: z.number().int().min(10).max(400),
+  url: z.string(),
+  title: z.string(),
+  viewport: z.object({
+    scrollX: z.number(),
+    scrollY: z.number(),
+  }),
+  nodes: z.array(z.object({
+    id: z.string(),
+    tag: z.string(),
+    role: z.string(),
+    name: z.string(),
+    value: z.string().optional(),
+    href: z.string().optional(),
+    visible: z.boolean(),
+    disabled: z.boolean().optional(),
+    checked: z.boolean().optional(),
+    selected: z.boolean().optional(),
+    expanded: z.boolean().optional(),
+  })).max(400),
+});
+
 export const searchPayloadSchema = z.object({
   query: z.string().min(1).max(200),
   caseSensitive: z.boolean().optional(),
@@ -122,6 +149,15 @@ export const modelsListPayloadSchema = z.object({
 
 export const rpcSchemas = {
   'dom.observe': observePayloadSchema,
+  'dom.changes.start': z.object({
+    maxNodes: z.number().int().min(10).max(400).optional(),
+  }),
+  'dom.changes.read': z.object({
+    baseline: changeSnapshotSchema,
+    timeoutMs: z.number().int().min(0).max(10_000).optional(),
+    quietMs: z.number().int().min(50).max(2_000).optional(),
+    maxChanges: z.number().int().min(1).max(100).optional(),
+  }),
   'dom.search': searchPayloadSchema,
   'dom.click': elementRefSchema,
   'dom.dblclick': elementRefSchema,

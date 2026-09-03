@@ -49,7 +49,7 @@ export function Composer({
   useEffect(() => {
     let cancelled = false;
     const timer = setTimeout(() => {
-      void rpc('models.list', { provider })
+      void rpc('models.list', { provider, baseURL: settings.model.baseURL })
         .then((models) => {
           if (cancelled) return;
           setRemoteModels((prev) => ({ ...prev, [provider]: models as CatalogModel[] }));
@@ -65,7 +65,13 @@ export function Composer({
     };
   }, [provider, settings.model.baseURL]);
 
-  const models = resolveModelList(modelsForProvider(provider), remoteModels[provider]).map(
+  const availableModels = resolveModelList(modelsForProvider(provider), remoteModels[provider]);
+  const models = [
+    ...availableModels,
+    ...(availableModels.some((item) => item.id === settings.model.model)
+      ? []
+      : [resolveCatalogModel(provider, settings.model.model)]),
+  ].map(
     (item) => ({ key: item.id, name: item.label, tag: item.tag }),
   );
 

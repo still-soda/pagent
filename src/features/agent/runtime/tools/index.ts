@@ -7,6 +7,7 @@ import { safeJson, truncate } from '@/shared/utils/utils';
 import type { AgentSettings } from '@/shared/contracts/settings';
 import type { McpToolMeta } from '@/shared/contracts/mcp';
 import type { MemoryScope } from '@/shared/contracts/memory';
+import type { PageChangeSnapshot } from '@/features/page/change-tracker';
 
 export type ToolBridge = {
   tabId: number;
@@ -56,6 +57,7 @@ export type ToolBridge = {
 /** 内置工具名集合，MCP 工具展示名与其冲突时自动加服务器前缀 */
 export const BUILTIN_TOOL_NAMES: ReadonlySet<string> = new Set([
   'observe_page',
+  'observe_page_changes',
   'search_page_text',
   'capture_screenshot',
   'click_element',
@@ -90,6 +92,24 @@ export const BUILTIN_TOOL_NAMES: ReadonlySet<string> = new Set([
 ]);
 
 export async function createAgentTools(bridge: ToolBridge) {
+  const changeWatches = new Map<string, PageChangeSnapshot>();
+  let lastWatchId: string | undefined;
+  const startChangeWatch = async () => {
+    const baseline = await bridge.content<PageChangeSnapshot>('dom.changes.start');
+    changeWatches.set(baseline.watchId, baseline);
+    lastWatchId = baseline.watchId;
+    while (changeWatches.size > 8) {
+      const oldest = changeWatches.keys().next().value as string | undefined;
+      if (!oldest) break;
+      changeWatches.delete(oldest);
+    }
+    return baseline;
+  };
+  const trackAction = async <T>(action: () => Promise<T>): Promise<T> => {
+    await startChangeWatch();
+    return action();
+  };
+
   const observe = tool(
     async ({ reason, maxElements }) => {
       const observation = await bridge.content('dom.observe', { reason, maxElements });
@@ -101,6 +121,46 @@ export async function createAgentTools(bridge: ToolBridge) {
       schema: z.object({
         reason: z.string().optional().describe('为什么需要重新观测'),
         maxElements: z.number().int().min(10).max(300).optional(),
+      }),
+    },
+  );
+
+  const observeChanges = tool(
+    async ({ action, watchId, timeoutMs, quietMs, maxChanges }) => {
+      if (action === 'start') {
+        const baseline = await startChangeWatch();
+        return safeJson({
+          watchId: baseline.watchId,
+          cursor: baseline.cursor,
+          message: '已开始观测；执行操作后用同一工具读取变化。',
+        });
+      }
+      const targetId = watchId ?? lastWatchId;
+      if (!targetId) {
+        return '尚无变化观测基线。请先以 action=start 调用本工具，或先执行一个页面操作。';
+      }
+      const baseline = changeWatches.get(targetId);
+      if (!baseline) return `变化观测 ${targetId} 已过期，请重新开始观测。`;
+      const result = await bridge.content('dom.changes.read', {
+        baseline,
+        timeoutMs,
+        quietMs,
+        maxChanges,
+      });
+      changeWatches.delete(targetId);
+      if (lastWatchId === targetId) lastWatchId = undefined;
+      return isolateUntrustedPage(safeJson(result));
+    },
+    {
+      name: 'observe_page_changes',
+      description:
+        '读取最近一次页面操作造成的语义变化，包括新增/移除元素、文本、表单状态、可见性、滚动和导航。默认读取最近操作的变化；观测外部异步变化时先用 action=start 留下基线，之后用 action=read。',
+      schema: z.object({
+        action: z.enum(['start', 'read']).optional().describe('默认 read'),
+        watchId: z.string().optional().describe('action=start 返回的观测 ID'),
+        timeoutMs: z.number().int().min(0).max(10_000).optional(),
+        quietMs: z.number().int().min(50).max(2_000).optional(),
+        maxChanges: z.number().int().min(1).max(100).optional(),
       }),
     },
   );
@@ -146,7 +206,7 @@ export async function createAgentTools(bridge: ToolBridge) {
 
   const click = tool(
     async ({ elementId, revision }) =>
-      safeJson(await bridge.content('dom.click', { elementId, revision })),
+      safeJson(await trackAction(() => bridge.content('dom.click', { elementId, revision }))),
     {
       name: 'click_element',
       description: '点击 observe_page 返回的 elementId。',
@@ -159,7 +219,7 @@ export async function createAgentTools(bridge: ToolBridge) {
 
   const dblclick = tool(
     async ({ elementId, revision }) =>
-      safeJson(await bridge.content('dom.dblclick', { elementId, revision })),
+      safeJson(await trackAction(() => bridge.content('dom.dblclick', { elementId, revision }))),
     {
       name: 'dblclick_element',
       description: '双击指定元素。',
@@ -172,7 +232,7 @@ export async function createAgentTools(bridge: ToolBridge) {
 
   const hover = tool(
     async ({ elementId, revision }) =>
-      safeJson(await bridge.content('dom.hover', { elementId, revision })),
+      safeJson(await trackAction(() => bridge.content('dom.hover', { elementId, revision }))),
     {
       name: 'hover_element',
       description: '悬停在指定元素上，用于展开菜单。',
@@ -185,7 +245,9 @@ export async function createAgentTools(bridge: ToolBridge) {
 
   const typeText = tool(
     async ({ elementId, text, clear, submit, revision }) =>
-      safeJson(await bridge.content('dom.type', { elementId, text, clear, submit, revision })),
+      safeJson(await trackAction(() =>
+        bridge.content('dom.type', { elementId, text, clear, submit, revision }),
+      )),
     {
       name: 'type_text',
       description: '向输入框输入文本。',
@@ -201,7 +263,7 @@ export async function createAgentTools(bridge: ToolBridge) {
 
   const clear = tool(
     async ({ elementId, revision }) =>
-      safeJson(await bridge.content('dom.clear', { elementId, revision })),
+      safeJson(await trackAction(() => bridge.content('dom.clear', { elementId, revision }))),
     {
       name: 'clear_field',
       description: '清空输入框。',
@@ -214,7 +276,9 @@ export async function createAgentTools(bridge: ToolBridge) {
 
   const select = tool(
     async ({ elementId, value, revision }) =>
-      safeJson(await bridge.content('dom.select', { elementId, value, revision })),
+      safeJson(await trackAction(() =>
+        bridge.content('dom.select', { elementId, value, revision }),
+      )),
     {
       name: 'select_option',
       description: '选择下拉框选项。',
@@ -228,7 +292,9 @@ export async function createAgentTools(bridge: ToolBridge) {
 
   const drag = tool(
     async ({ elementId, targetId, revision }) =>
-      safeJson(await bridge.content('dom.drag', { elementId, targetId, revision })),
+      safeJson(await trackAction(() =>
+        bridge.content('dom.drag', { elementId, targetId, revision }),
+      )),
     {
       name: 'drag_element',
       description: '把一个元素拖到另一个元素上。',
@@ -241,7 +307,8 @@ export async function createAgentTools(bridge: ToolBridge) {
   );
 
   const press = tool(
-    async ({ key }) => safeJson(await bridge.content('dom.press', { key })),
+    async ({ key }) =>
+      safeJson(await trackAction(() => bridge.content('dom.press', { key }))),
     {
       name: 'press_key',
       description: '向当前焦点发送按键，例如 Enter、Escape、Tab。',
@@ -250,7 +317,8 @@ export async function createAgentTools(bridge: ToolBridge) {
   );
 
   const scroll = tool(
-    async (payload) => safeJson(await bridge.content('dom.scroll', payload)),
+    async (payload) =>
+      safeJson(await trackAction(() => bridge.content('dom.scroll', payload))),
     {
       name: 'scroll_page',
       description: '滚动页面或滚到某个元素。',
@@ -293,7 +361,7 @@ export async function createAgentTools(bridge: ToolBridge) {
   const navigate = tool(
     async ({ url }) => {
       assertNavigableUrl(url, bridge.settings);
-      return safeJson(await bridge.navigate(url));
+      return safeJson(await trackAction(() => bridge.navigate(url)));
     },
     {
       name: 'navigate',
@@ -302,19 +370,19 @@ export async function createAgentTools(bridge: ToolBridge) {
     },
   );
 
-  const back = tool(async () => safeJson(await bridge.back()), {
+  const back = tool(async () => safeJson(await trackAction(() => bridge.back())), {
     name: 'go_back',
     description: '浏览器后退。',
     schema: z.object({}),
   });
 
-  const forward = tool(async () => safeJson(await bridge.forward()), {
+  const forward = tool(async () => safeJson(await trackAction(() => bridge.forward())), {
     name: 'go_forward',
     description: '浏览器前进。',
     schema: z.object({}),
   });
 
-  const reload = tool(async () => safeJson(await bridge.reload()), {
+  const reload = tool(async () => safeJson(await trackAction(() => bridge.reload())), {
     name: 'reload_page',
     description: '刷新当前页面。',
     schema: z.object({}),
@@ -407,7 +475,10 @@ export async function createAgentTools(bridge: ToolBridge) {
       if (!bridge.settings.allowCdpScript) {
         return '用户未启用 CDP 任意表达式执行。请改用 observe_page 或 execute_named_script。';
       }
-      return truncate(safeJson(await bridge.cdp.script(expression, awaitPromise)), 6000);
+      return truncate(
+        safeJson(await trackAction(() => bridge.cdp.script(expression, awaitPromise))),
+        6000,
+      );
     },
     {
       name: 'execute_cdp_script',
@@ -424,7 +495,9 @@ export async function createAgentTools(bridge: ToolBridge) {
       if (bridge.settings.executionMode !== 'cdp') {
         return '当前为 DOM 模式。如需坐标级输入，请在设置中切换到 CDP。';
       }
-      return safeJson(await bridge.cdp.input({ x, y, type: 'click', text }));
+      return safeJson(
+        await trackAction(() => bridge.cdp.input({ x, y, type: 'click', text })),
+      );
     },
     {
       name: 'cdp_click_xy',
@@ -528,6 +601,7 @@ export async function createAgentTools(bridge: ToolBridge) {
 
   const builtinTools = [
     observe,
+    observeChanges,
     search,
     screenshot,
     click,
