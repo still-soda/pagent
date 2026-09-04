@@ -68,6 +68,9 @@ export async function runAgent(options: {
       }),
     onStatus: (text) => options.emit({ type: 'thinking', text }),
     onUsage: () => emitUsage(),
+    maxModelCalls: settings.maxModelCalls,
+    maxToolCalls: settings.maxToolCalls,
+    maxDurationMs: settings.maxDurationMs,
   });
 
   emitUsage = () => {
@@ -90,7 +93,10 @@ export async function runAgent(options: {
     middleware: [safety.middleware],
   });
   const tasks: TaskRow[] = [];
-  const recursionLimit = 10_000;
+  const recursionLimit = Math.max(
+    50,
+    (settings.maxModelCalls + settings.maxToolCalls) * 2 + 10,
+  );
   const CHECKPOINT_INTERVAL_MS = 750;
   let checkpointTimer: ReturnType<typeof setTimeout> | undefined;
   let checkpointQueue: Promise<unknown> = Promise.resolve();
