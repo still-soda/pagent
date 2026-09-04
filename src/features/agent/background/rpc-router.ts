@@ -75,6 +75,27 @@ import {
 } from '@/features/memory/service';
 
 const PERMANENTLY_HIDDEN_KEY = 'pagent:permanently-hidden';
+const CURRENT_PAGE_HIDDEN_PREFIX = 'pagent:current-page-hidden:';
+
+function currentPageHiddenKey(tabId: number) {
+  return `${CURRENT_PAGE_HIDDEN_PREFIX}${tabId}`;
+}
+
+async function readCurrentPageHidden(tabId: number): Promise<boolean> {
+  const key = currentPageHiddenKey(tabId);
+  const [stored, tab] = await Promise.all([
+    browser.storage.local.get(key),
+    browser.tabs.get(tabId),
+  ]);
+  const state = stored[key] as { url?: string } | undefined;
+  const hidden = Boolean(state?.url && state.url === tab.url);
+  if (state && !hidden) await browser.storage.local.remove(key);
+  return hidden;
+}
+
+export async function clearCurrentPageHidden(tabId: number) {
+  await browser.storage.local.remove(currentPageHiddenKey(tabId));
+}
 
 export async function handleRpc(name: RpcName, payload: unknown, senderTabId?: number) {
   const tabId = senderTabId ?? (await getActiveTab()).id!;
@@ -358,18 +379,26 @@ export async function handleRpc(name: RpcName, payload: unknown, senderTabId?: n
       return togglePanel(tabId);
     case 'menu.getState': {
       const stored = await browser.storage.local.get(PERMANENTLY_HIDDEN_KEY);
-      return { permanentlyHidden: stored[PERMANENTLY_HIDDEN_KEY] === true };
+      return {
+        permanentlyHidden: stored[PERMANENTLY_HIDDEN_KEY] === true,
+        currentHidden: await readCurrentPageHidden(tabId),
+      };
     }
     case 'menu.openCurrent':
+      await clearCurrentPageHidden(tabId);
       await sendToContent(tabId, 'ui.open', {});
       return { ok: true };
-    case 'menu.hideCurrent':
+    case 'menu.hideCurrent': {
+      const tab = await browser.tabs.get(tabId);
+      await browser.storage.local.set({
+        [currentPageHiddenKey(tabId)]: { url: tab.url ?? '' },
+      });
       await sendToContent(tabId, 'ui.hide', {});
       return { ok: true };
+    }
     case 'menu.setPermanentlyHidden': {
       const { hidden } = parseRpcPayload('menu.setPermanentlyHidden', payload);
       await browser.storage.local.set({ [PERMANENTLY_HIDDEN_KEY]: hidden });
-      await sendToContent(tabId, hidden ? 'ui.hide' : 'ui.open', {}).catch(() => {});
       return { permanentlyHidden: hidden };
     }
     default:

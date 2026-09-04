@@ -6,7 +6,7 @@ import { TOGGLE_PANEL_COMMAND } from '@/shared/extension/hotkey';
 import { installServiceWorkerKeepAlive } from '@/shared/extension/keepalive';
 import { archiveTabNavigation, clearTabStoreState } from '@/features/agent/background/tab-store';
 import { running, stopAgentForTab } from '@/features/agent/background/agent-controller';
-import { handleRpc } from '@/features/agent/background/rpc-router';
+import { clearCurrentPageHidden, handleRpc } from '@/features/agent/background/rpc-router';
 import { recoverInterruptedSessions } from '@/features/agent/background/session-recovery';
 import { syncMcpServers } from '@/features/mcp/background/mcp-manager';
 import { togglePanel } from '@/features/agent/background/content-bridge';
@@ -62,6 +62,7 @@ export default defineBackground(() => {
     stopAgentForTab(tabId);
     clearTabStoreState(tabId);
     running.delete(tabId);
+    void clearCurrentPageHidden(tabId).catch(() => {});
     void clearTabUi(tabId).catch(() => {});
   });
 

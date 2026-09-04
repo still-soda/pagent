@@ -496,6 +496,37 @@
   animation: pagent-fab-blink 15s ease-in-out infinite;
 }
 
+.pagent-settings-logo {
+  position: relative;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  filter: drop-shadow(0 5px 9px oklch(0.31 0.11 266 / 0.2));
+}
+
+.pagent-settings-logo .pagent-fab-face {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+}
+
+.pagent-settings-logo .pagent-fab-eyes,
+.pagent-settings-logo .pagent-fab-eyes-orbit {
+  gap: 5px;
+}
+
+.pagent-settings-logo .pagent-fab-eyes-orbit {
+  transform: translateZ(14px);
+}
+
+.pagent-settings-logo .pagent-fab-eye {
+  width: 4px;
+  height: 11px;
+  animation: pagent-fab-blink 15s ease-in-out infinite;
+}
+
 .pagent-fab:hover .pagent-fab-face {
   filter: saturate(1.08) brightness(1.06);
 }

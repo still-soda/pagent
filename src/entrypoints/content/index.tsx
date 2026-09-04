@@ -15,6 +15,8 @@ import { handleContentCommand } from '@/features/page/content-command-handler';
 import { dispatchUiCommand, type UiCommand, uiEvents } from '@/features/page/ui-events';
 import { pageChangeTracker } from '@/features/page/change-tracker';
 
+let currentPageHidden = false;
+
 function persistPanelOpen(open: boolean) {
   void rpc('session.setUi', { panelOpen: open });
 }
@@ -46,10 +48,11 @@ function ContentShell() {
       rpc('menu.getState', {}),
     ]).then(([sessionValue, menuValue]) => {
       const context = sessionValue as SessionContext;
-      const menu = menuValue as { permanentlyHidden?: boolean };
-      const hidden = Boolean(menu.permanentlyHidden);
-      setPermanentlyHidden(hidden);
-      setVisible(!hidden);
+      const menu = menuValue as { currentHidden?: boolean; permanentlyHidden?: boolean };
+      const permanentlyHidden = Boolean(menu.permanentlyHidden);
+      currentPageHidden = Boolean(menu.currentHidden);
+      setPermanentlyHidden(permanentlyHidden);
+      setVisible(!permanentlyHidden && !currentPageHidden);
       if (context.panelOpen || context.running) setOpen(true);
     });
     const onToggle = () => togglePanel();
@@ -77,7 +80,7 @@ function ContentShell() {
       if (!change) return;
       const hidden = change.newValue === true;
       setPermanentlyHidden(hidden);
-      if (!hidden) setVisible(true);
+      setVisible(!hidden && !currentPageHidden);
     };
     const shadowRoot = document.querySelector('pagent-root')?.shadowRoot;
     uiEvents.addEventListener('toggle', onToggle);
@@ -127,10 +130,16 @@ export default defineContentScript({
         return;
       }
       if (message.kind !== 'content-command') return;
+      if (message.name === 'ui.state') {
+        sendResponse({ ok: true, result: { hidden: currentPageHidden } });
+        return;
+      }
       Promise.resolve(handleContentCommand(message.name, message.payload ?? {}))
         .then(async (result) => {
           if (result && typeof result === 'object' && 'uiCommand' in result) {
             const uiCommand = result.uiCommand as UiCommand;
+            if (uiCommand === 'ui.hide') currentPageHidden = true;
+            if (uiCommand === 'ui.open' || uiCommand === 'ui.toggle') currentPageHidden = false;
             dispatchUiCommand(uiCommand);
             if (uiCommand === 'ui.capture.start') {
               await new Promise<void>((resolve) =>
