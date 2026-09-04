@@ -8,6 +8,7 @@ describe('tool display', () => {
     expect(toolLabel('get_network_log')).toBe('查看网络请求');
     expect(toolLabel('execute_named_script')).toBe('运行内置脚本');
     expect(toolLabel('get_source')).toBe('查看源码');
+    expect(toolLabel('inspect_element_tree')).toBe('查看元素结构');
   });
 
   it('describes the action instead of a terminal invocation', () => {
@@ -19,6 +20,7 @@ describe('tool display', () => {
     expect(toolChip('get_source', { type: 'dom' })).toBe('实时 HTML');
     expect(toolChip('get_source', { type: 'scripts', grep: 'gtag' })).toBe('scripts 搜索「gtag」');
     expect(toolChip('observe_page', {}, 'running')).toBe('查看当前页面');
+    expect(toolChip('inspect_element_tree', { elementId: 'el_example' })).toBe('根元素 el_example');
   });
 
   it('only treats page scripts as monospaced', () => {

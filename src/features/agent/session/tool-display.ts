@@ -21,6 +21,7 @@ const NAMED_SCRIPTS: Record<string, string> = {
   extract_links: '提取链接',
   extract_headings: '提取标题',
   extract_forms: '提取表单',
+  extract_interactions: '提取交互目标',
   extract_meta: '提取元信息',
   page_stats: '页面统计',
   get_selection: '读取选区',
@@ -37,6 +38,7 @@ const TOOLS: Record<string, ToolMeta> = {
   type_text: { label: '输入文字', kind: 'type' },
   clear_field: { label: '清空输入', kind: 'type' },
   select_option: { label: '选择选项', kind: 'type' },
+  interact_elements: { label: '批量交互', kind: 'type' },
   drag_element: { label: '拖拽', kind: 'click' },
   press_key: { label: '按下按键', kind: 'type' },
   scroll_page: { label: '滚动页面', kind: 'navigate' },
@@ -52,6 +54,8 @@ const TOOLS: Record<string, ToolMeta> = {
   open_tab: { label: '打开标签页', kind: 'tab' },
   switch_tab: { label: '切换标签页', kind: 'tab' },
   close_tab: { label: '关闭标签页', kind: 'tab' },
+  extract_interactions: { label: '提取交互目标', kind: 'observe' },
+  inspect_element_tree: { label: '查看元素结构', kind: 'read' },
   execute_named_script: { label: '运行内置脚本', kind: 'read' },
   execute_cdp_script: { label: '执行页面脚本', kind: 'script' },
   cdp_click_xy: { label: '坐标点击', kind: 'click' },
@@ -127,6 +131,8 @@ export function toolChip(name: string, args?: unknown, status?: string): string 
       return text(fields.text) ? `「${truncate(text(fields.text), 24)}」` : '写入输入框';
     case 'select_option':
       return text(fields.value) ? `选中 ${truncate(text(fields.value), 24)}` : '选择一项';
+    case 'interact_elements':
+      return Array.isArray(fields.steps) ? `${fields.steps.length} 个目标` : '批量执行';
     case 'drag_element':
       return text(fields.targetId) ? `拖到 ${truncate(text(fields.targetId), 16)}` : '拖动元素';
     case 'press_key':
@@ -174,6 +180,10 @@ export function toolChip(name: string, args?: unknown, status?: string): string 
     case 'switch_tab':
     case 'close_tab':
       return typeof fields.tabId === 'number' ? `标签 ${fields.tabId}` : fallback;
+    case 'inspect_element_tree':
+      return text(fields.elementId)
+        ? `根元素 ${truncate(text(fields.elementId), 18)}`
+        : '轻量元素树';
     case 'execute_named_script':
       return NAMED_SCRIPTS[text(fields.name)] ?? text(fields.name) ?? '只读脚本';
     case 'execute_cdp_script':

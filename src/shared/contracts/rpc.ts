@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { API_PROTOCOLS, PROVIDER_IDS } from './settings';
-import { NAMED_SCRIPTS, SOURCE_TYPES } from './page';
+import { ELEMENT_ACTIONS, NAMED_SCRIPTS, SOURCE_TYPES } from './page';
 import { mcpConfigSchema } from './mcp';
 import { CHANNEL } from './channel';
 import {
@@ -19,6 +19,7 @@ export const elementRefSchema = z.object({
 export const observePayloadSchema = z.object({
   reason: z.string().optional(),
   maxElements: z.number().int().min(1).max(400).optional(),
+  scope: z.enum(['auto', 'page', 'interaction']).optional(),
 });
 
 export const changeSnapshotSchema = z.object({
@@ -52,12 +53,19 @@ export const searchPayloadSchema = z.object({
   query: z.string().min(1).max(200),
   caseSensitive: z.boolean().optional(),
   maxResults: z.number().int().min(1).max(80).optional(),
+  scope: z.enum(['auto', 'page', 'interaction']).optional(),
 });
 
 export const typePayloadSchema = elementRefSchema.extend({
   text: z.string(),
+  mode: z.enum(['replace', 'append']).optional(),
   clear: z.boolean().optional(),
   submit: z.boolean().optional(),
+});
+
+export const interactionStepSchema = elementRefSchema.extend({
+  intent: z.enum(ELEMENT_ACTIONS),
+  value: z.union([z.string(), z.boolean(), z.number()]).optional(),
 });
 
 export const keyPayloadSchema = z.object({
@@ -81,6 +89,19 @@ export const waitPayloadSchema = z.object({
 
 export const namedScriptPayloadSchema = z.object({
   name: z.enum(NAMED_SCRIPTS),
+  scope: z.enum(['auto', 'page', 'interaction']).optional(),
+});
+
+export const elementTreePayloadSchema = elementRefSchema.extend({
+  fields: z.object({
+    text: z.boolean().optional(),
+    coordinates: z.boolean().optional(),
+    attributes: z.array(
+      z.string().regex(/^[A-Za-z_:][A-Za-z0-9:._-]*$/),
+    ).max(20).optional(),
+  }).optional(),
+  maxDepth: z.number().int().min(0).max(20).optional(),
+  maxLength: z.number().int().min(2).max(2_000).optional(),
 });
 
 export const sourcePayloadSchema = z.object({
@@ -167,11 +188,15 @@ export const rpcSchemas = {
   'dom.type': typePayloadSchema,
   'dom.clear': elementRefSchema,
   'dom.select': elementRefSchema.extend({ value: z.string() }),
+  'dom.interact': z.object({
+    steps: z.array(interactionStepSchema).min(1).max(30),
+  }),
   'dom.drag': elementRefSchema.extend({ targetId: z.string() }),
   'dom.press': keyPayloadSchema,
   'dom.scroll': scrollPayloadSchema,
   'dom.wait': waitPayloadSchema,
   'dom.script': namedScriptPayloadSchema,
+  'dom.elementTree': elementTreePayloadSchema,
   'page.info': z.object({}),
   'page.source': sourcePayloadSchema,
   'page.navigate': navigatePayloadSchema,

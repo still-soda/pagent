@@ -1,6 +1,13 @@
 import { redactText } from '@/shared/contracts/policy';
 import { truncate } from '@/shared/utils/utils';
-import { implicitRole, pageObserver, SKIP, visibleText } from './observer';
+import {
+  activeInteractionContext,
+  implicitRole,
+  pageObserver,
+  SKIP,
+  visibleText,
+} from './observer';
+import type { ObservationScope } from '@/shared/contracts/page';
 
 export type TextSearchHit = {
   elementId: string;
@@ -17,6 +24,7 @@ export type TextSearchHit = {
 export type TextSearchResult = {
   query: string;
   revision: number;
+  interactionContextId?: string;
   total: number;
   count: number;
   truncated: boolean;
@@ -55,7 +63,11 @@ const MAX_SCAN = 8_000;
 
 export function searchPageText(
   query: string,
-  options: { caseSensitive?: boolean; maxResults?: number } = {},
+  options: {
+    caseSensitive?: boolean;
+    maxResults?: number;
+    scope?: ObservationScope;
+  } = {},
 ): TextSearchResult {
   const trimmed = query.trim();
   if (!trimmed) {
@@ -67,8 +79,10 @@ export function searchPageText(
   const hits: TextSearchHit[] = [];
   let total = 0;
   let scanned = 0;
+  const context = options.scope === 'page' ? null : activeInteractionContext();
+  const scanRoot = context ?? document;
 
-  const visitRoot = (root: Document | ShadowRoot) => {
+  const visitRoot = (root: Document | ShadowRoot | Element) => {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode(node) {
         const parent = node.parentElement;
@@ -108,9 +122,11 @@ export function searchPageText(
     }
   };
 
-  visitRoot(document);
+  visitRoot(scanRoot);
 
-  for (const el of Array.from(document.querySelectorAll('input, textarea, [alt], [title], [aria-label], [placeholder]'))) {
+  for (const el of Array.from(scanRoot.querySelectorAll(
+    'input, textarea, select, [role], [alt], [title], [aria-label], [placeholder], [id], [name]',
+  ))) {
     if (scanned >= MAX_SCAN) break;
     if (el.closest(SKIP)) continue;
     scanned += 1;
@@ -120,6 +136,8 @@ export function searchPageText(
       el.getAttribute('aria-label') ?? '',
       el.getAttribute('alt') ?? '',
       el.getAttribute('title') ?? '',
+      el.getAttribute('id') ?? '',
+      el.getAttribute('name') ?? '',
     ].filter(Boolean);
     for (const extra of extras) {
       collectMatches(extra, el, trimmed, options.caseSensitive);
@@ -129,6 +147,7 @@ export function searchPageText(
   return {
     query: trimmed,
     revision: pageObserver.revision,
+    interactionContextId: context ? pageObserver.register(context) : undefined,
     total,
     count: hits.length,
     truncated: total > hits.length || scanned >= MAX_SCAN,
@@ -153,7 +172,14 @@ function toHit(el: Element, source: string, index: number, matchLength: number):
     tag: described?.tag ?? el.tagName.toLowerCase(),
     role: described?.role || implicitRole(el),
     name: described?.name || redactText(truncate(visibleText(el), 120)),
-    visible: described?.visible ?? (rect.width > 1 && rect.height > 1 && rect.bottom > 0 && rect.right > 0),
+    visible: described?.visible ?? (
+      rect.width > 1
+      && rect.height > 1
+      && rect.bottom > 0
+      && rect.right > 0
+      && rect.top < window.innerHeight
+      && rect.left < window.innerWidth
+    ),
     clickable: described?.clickable ?? false,
     box: described?.box ?? {
       x: Math.round(rect.x),

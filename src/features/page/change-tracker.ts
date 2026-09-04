@@ -220,7 +220,10 @@ export class PageChangeTracker {
   install(root: Document = document): () => void {
     if (this.observer) return () => this.disconnect();
     this.observer = new MutationObserver((records) => {
-      const relevant = records.filter((record) => !isIgnored(record.target));
+      const relevant = records.filter(
+        (record) => !isIgnored(record.target)
+          && !(record.type === 'attributes' && record.attributeName === 'style'),
+      );
       if (relevant.length) this.signal(relevant.length);
     });
     this.observer.observe(root.documentElement, {

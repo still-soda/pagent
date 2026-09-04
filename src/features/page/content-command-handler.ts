@@ -6,6 +6,8 @@ import {
   focusElement,
   highlight,
   hoverElement,
+  inspectElementTree,
+  interactElements,
   pressKey,
   runNamedScript,
   scrollPage,
@@ -17,7 +19,12 @@ import {
 import { getRememberedSelection } from './selection';
 import { searchPageText } from './search';
 import { getPageSource } from './source';
-import type { NamedScript, SourceType } from '@/shared/contracts/page';
+import type {
+  InteractionStep,
+  NamedScript,
+  ObservationScope,
+  SourceType,
+} from '@/shared/contracts/page';
 import {
   pageChangeTracker,
   type PageChangeSnapshot,
@@ -32,7 +39,11 @@ export function handleContentCommand(name: string, payload: Record<string, unkno
     case 'ui.capture.end':
       return { ok: true, uiCommand: name };
     case 'dom.observe':
-      return pageObserver.observe(document, Number(payload.maxElements ?? 140));
+      return pageObserver.observe(
+        document,
+        Number(payload.maxElements ?? 140),
+        payload.scope as ObservationScope | undefined,
+      );
     case 'dom.changes.start':
       return pageChangeTracker.snapshot(Number(payload.maxNodes ?? 400));
     case 'dom.changes.read':
@@ -45,6 +56,7 @@ export function handleContentCommand(name: string, payload: Record<string, unkno
       return searchPageText(String(payload.query ?? ''), {
         caseSensitive: Boolean(payload.caseSensitive),
         maxResults: payload.maxResults as number | undefined,
+        scope: payload.scope as ObservationScope | undefined,
       });
     case 'dom.click':
       return clickElement(String(payload.elementId), payload.revision as number | undefined);
@@ -64,7 +76,8 @@ export function handleContentCommand(name: string, payload: Record<string, unkno
     }
     case 'dom.type':
       return typeText(String(payload.elementId), String(payload.text ?? ''), {
-        clear: Boolean(payload.clear),
+        mode: payload.mode as 'replace' | 'append' | undefined,
+        clear: typeof payload.clear === 'boolean' ? payload.clear : undefined,
         submit: Boolean(payload.submit),
         revision: payload.revision as number | undefined,
       });
@@ -76,6 +89,8 @@ export function handleContentCommand(name: string, payload: Record<string, unkno
         String(payload.value ?? ''),
         payload.revision as number | undefined,
       );
+    case 'dom.interact':
+      return interactElements(payload.steps as InteractionStep[]);
     case 'dom.press':
       return pressKey(String(payload.key ?? 'Enter'));
     case 'dom.drag':
@@ -99,7 +114,20 @@ export function handleContentCommand(name: string, payload: Record<string, unkno
         urlIncludes: payload.urlIncludes as string | undefined,
       });
     case 'dom.script':
-      return runNamedScript(payload.name as NamedScript);
+      return runNamedScript(payload.name as NamedScript, {
+        scope: payload.scope as ObservationScope | undefined,
+      });
+    case 'dom.elementTree':
+      return inspectElementTree(String(payload.elementId), {
+        revision: payload.revision as number | undefined,
+        fields: payload.fields as {
+          text?: boolean;
+          coordinates?: boolean;
+          attributes?: string[];
+        } | undefined,
+        maxDepth: payload.maxDepth as number | undefined,
+        maxLength: payload.maxLength as number | undefined,
+      });
     case 'page.info':
       return {
         url: location.href,

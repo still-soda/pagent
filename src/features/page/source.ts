@@ -46,6 +46,7 @@ export type SourceResult = {
   hasMore: boolean;
   nextOffset?: number;
   truncated: boolean;
+  hint?: string;
   value?: string;
   content?: string;
   matches?: SourceMatch[];
@@ -102,6 +103,9 @@ export function serializeLiveDom(root: Document = document): string {
   const clone = root.documentElement.cloneNode(true) as HTMLElement;
   for (const node of Array.from(clone.querySelectorAll('pagent-root, [data-pagent-ui]'))) {
     node.remove();
+  }
+  for (const node of Array.from(clone.querySelectorAll('script, style, svg'))) {
+    node.replaceChildren();
   }
   const doctype = root.doctype ? `<!DOCTYPE ${root.doctype.name}>\n` : '';
   return `${doctype}${clone.outerHTML}`;
@@ -173,6 +177,9 @@ function finishText(
       hasMore: offset + page.length < matches.length,
       nextOffset: offset + page.length < matches.length ? offset + page.length : undefined,
       truncated: offset + page.length < matches.length,
+      hint: matches.length === 0 && !query.regex && /[|()[\]{}+*?^$\\]/.test(query.grep ?? '')
+        ? 'grep 当前按普通子串匹配；如果这是正则表达式，请设置 regex=true'
+        : undefined,
       matches: page,
     };
   }

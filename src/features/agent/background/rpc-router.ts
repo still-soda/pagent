@@ -127,6 +127,7 @@ export async function handleRpc(name: RpcName, payload: unknown, senderTabId?: n
     case 'dom.scroll':
     case 'dom.wait':
     case 'dom.script':
+    case 'dom.elementTree':
     case 'page.info':
     case 'page.source':
       return sendToContent(tabId, name, parseRpcPayload(name, payload));

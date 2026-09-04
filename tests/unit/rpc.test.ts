@@ -11,10 +11,41 @@ describe('rpc schemas', () => {
   });
 
   it('parses observe payload', () => {
-    expect(parseRpcPayload('dom.observe', { reason: 'init', maxElements: 80 })).toEqual({
+    expect(parseRpcPayload('dom.observe', {
       reason: 'init',
       maxElements: 80,
+      scope: 'page',
+    })).toEqual({
+      reason: 'init',
+      maxElements: 80,
+      scope: 'page',
     });
+  });
+
+  it('parses lightweight element tree options', () => {
+    expect(parseRpcPayload('dom.elementTree', {
+      elementId: 'el_1',
+      fields: {
+        text: true,
+        coordinates: true,
+        attributes: ['aria-label', 'data-testid'],
+      },
+      maxDepth: 5,
+      maxLength: 100,
+    })).toEqual({
+      elementId: 'el_1',
+      fields: {
+        text: true,
+        coordinates: true,
+        attributes: ['aria-label', 'data-testid'],
+      },
+      maxDepth: 5,
+      maxLength: 100,
+    });
+    expect(() => parseRpcPayload('dom.elementTree', {
+      elementId: 'el_1',
+      fields: { attributes: ['not valid'] },
+    })).toThrow();
   });
 
   it('rejects unknown named scripts', () => {

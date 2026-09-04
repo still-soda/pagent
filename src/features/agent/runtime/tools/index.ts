@@ -66,6 +66,7 @@ export const BUILTIN_TOOL_NAMES: ReadonlySet<string> = new Set([
   'type_text',
   'clear_field',
   'select_option',
+  'interact_elements',
   'drag_element',
   'press_key',
   'scroll_page',
@@ -81,6 +82,8 @@ export const BUILTIN_TOOL_NAMES: ReadonlySet<string> = new Set([
   'open_tab',
   'switch_tab',
   'close_tab',
+  'extract_interactions',
+  'inspect_element_tree',
   'execute_named_script',
   'execute_cdp_script',
   'cdp_click_xy',
@@ -111,16 +114,18 @@ export async function createAgentTools(bridge: ToolBridge) {
   };
 
   const observe = tool(
-    async ({ reason, maxElements }) => {
-      const observation = await bridge.content('dom.observe', { reason, maxElements });
-      return isolateUntrustedPage(safeJson(observation));
+    async ({ reason, maxElements, scope }) => {
+      const observation = await bridge.content('dom.observe', { reason, maxElements, scope });
+      return isolateUntrustedPage(safeJson(observation, 24_000));
     },
     {
       name: 'observe_page',
-      description: '观测当前页面的语义 DOM、可见元素、选区和文本预览。操作前或页面变化后必须调用。',
+      description:
+        '建立当前页面的精简语义快照。首次了解页面、页面大范围变化或元素过期时调用；普通操作后优先使用后置条件或 observe_page_changes，不要重复全页观测。scope=auto 时自动聚焦临时交互层；误判常驻导航时用 scope=page 强制整页扫描。',
       schema: z.object({
         reason: z.string().optional().describe('为什么需要重新观测'),
         maxElements: z.number().int().min(10).max(300).optional(),
+        scope: z.enum(['auto', 'page', 'interaction']).optional().describe('默认 auto'),
       }),
     },
   );
@@ -166,9 +171,14 @@ export async function createAgentTools(bridge: ToolBridge) {
   );
 
   const search = tool(
-    async ({ query, caseSensitive, maxResults }) =>
+    async ({ query, caseSensitive, maxResults, scope }) =>
       isolateUntrustedPage(
-        safeJson(await bridge.content('dom.search', { query, caseSensitive, maxResults })),
+        safeJson(await bridge.content('dom.search', {
+          query,
+          caseSensitive,
+          maxResults,
+          scope,
+        })),
       ),
     {
       name: 'search_page_text',
@@ -178,6 +188,7 @@ export async function createAgentTools(bridge: ToolBridge) {
         query: z.string().min(1).max(200),
         caseSensitive: z.boolean().optional(),
         maxResults: z.number().int().min(1).max(80).optional(),
+        scope: z.enum(['auto', 'page', 'interaction']).optional().describe('默认 auto'),
       }),
     },
   );
@@ -244,17 +255,18 @@ export async function createAgentTools(bridge: ToolBridge) {
   );
 
   const typeText = tool(
-    async ({ elementId, text, clear, submit, revision }) =>
+    async ({ elementId, text, mode, submit, revision }) =>
       safeJson(await trackAction(() =>
-        bridge.content('dom.type', { elementId, text, clear, submit, revision }),
+        bridge.content('dom.type', { elementId, text, mode, submit, revision }),
       )),
     {
       name: 'type_text',
-      description: '向输入框输入文本。',
+      description:
+        '原子设置输入框文本并返回 changed/satisfied。默认 replace，避免“先清空再输入”的竞态；只有明确需要保留原值时才使用 append。',
       schema: z.object({
         elementId: z.string(),
         text: z.string(),
-        clear: z.boolean().optional(),
+        mode: z.enum(['replace', 'append']).default('replace'),
         submit: z.boolean().optional(),
         revision: z.number().optional(),
       }),
@@ -286,6 +298,24 @@ export async function createAgentTools(bridge: ToolBridge) {
         elementId: z.string(),
         value: z.string(),
         revision: z.number().optional(),
+      }),
+    },
+  );
+
+  const interact = tool(
+    async ({ steps }) =>
+      safeJson(await trackAction(() => bridge.content('dom.interact', { steps })), 16_000),
+    {
+      name: 'interact_elements',
+      description:
+        '批量执行通用元素交互，并逐项返回 before/after/changed/satisfied。适用于设置值、切换状态、选择选项和激活元素；优先用于多个已知目标，避免逐项往返。',
+      schema: z.object({
+        steps: z.array(z.object({
+          elementId: z.string(),
+          intent: z.enum(['activate', 'set-value', 'set-checked', 'choose-option']),
+          value: z.union([z.string(), z.boolean(), z.number()]).optional(),
+          revision: z.number().int().nonnegative().optional(),
+        })).min(1).max(30),
       }),
     },
   );
@@ -456,7 +486,7 @@ export async function createAgentTools(bridge: ToolBridge) {
     {
       name: 'execute_named_script',
       description:
-        '执行扩展内置只读脚本：extract_links、extract_headings、extract_forms、extract_meta、page_stats、get_selection。',
+        '执行扩展内置只读脚本：extract_links、extract_headings、extract_forms、extract_meta、page_stats、get_selection。交互目标请直接调用 extract_interactions，不要从这里重复提取。',
       schema: z.object({
         name: z.enum([
           'extract_links',
@@ -466,6 +496,47 @@ export async function createAgentTools(bridge: ToolBridge) {
           'page_stats',
           'get_selection',
         ]),
+      }),
+    },
+  );
+
+  const extractInteractions = tool(
+    async ({ scope }) => isolateUntrustedPage(
+      safeJson(await bridge.content('dom.script', {
+        name: 'extract_interactions',
+        scope,
+      }), 16_000),
+    ),
+    {
+      name: 'extract_interactions',
+      description:
+        '提取当前页面或已打开临时交互上下文中的可操作目标、当前状态、可用动作和选项，适合在多字段任务开始时一次建立目标账本。临时层被误判时用 scope=page。',
+      schema: z.object({
+        scope: z.enum(['auto', 'page', 'interaction']).optional().describe('默认 auto'),
+      }),
+    },
+  );
+
+  const inspectElementTree = tool(
+    async (payload) => isolateUntrustedPage(
+      safeJson(await bridge.content('dom.elementTree', payload), 48_000),
+    ),
+    {
+      name: 'inspect_element_tree',
+      description:
+        '把 observe_page 返回的根 elementId 转成轻量缩进文本树。每行只标注标签和语义角色；fields 可选择附带直接文本、视口坐标或指定 DOM 属性。maxDepth 超出的子树以 more-level 标注剩余层数，maxLength 超出的标签以 more-label 标注剩余标签数。',
+      schema: z.object({
+        elementId: z.string().describe('observe_page 或 search_page_text 返回的元素 ID'),
+        revision: z.number().int().nonnegative().optional(),
+        fields: z.object({
+          text: z.boolean().optional().describe('附带元素的直接文本，叶子元素附带完整文本'),
+          coordinates: z.boolean().optional().describe('附带 x,y,width,height 视口坐标'),
+          attributes: z.array(
+            z.string().regex(/^[A-Za-z_:][A-Za-z0-9:._-]*$/),
+          ).max(20).optional().describe('要附带的 DOM 属性名，如 aria-label、data-testid'),
+        }).optional(),
+        maxDepth: z.number().int().min(0).max(20).optional().describe('最大深度，根元素为第 0 层，默认 4'),
+        maxLength: z.number().int().min(2).max(2_000).optional().describe('最大输出标签数，默认 120'),
       }),
     },
   );
@@ -482,7 +553,8 @@ export async function createAgentTools(bridge: ToolBridge) {
     },
     {
       name: 'execute_cdp_script',
-      description: '仅在用户启用后，通过 CDP Runtime.evaluate 在当前被调试页面执行表达式。',
+      description:
+        '仅在用户启用且 observe_page、extract_interactions 等结构化工具明确失败后，通过 CDP Runtime.evaluate 执行一次有界诊断或操作。不要用多个脚本逐项摸索页面结构。',
       schema: z.object({
         expression: z.string(),
         awaitPromise: z.boolean().optional(),
@@ -491,12 +563,12 @@ export async function createAgentTools(bridge: ToolBridge) {
   );
 
   const cdpClick = tool(
-    async ({ x, y, text }) => {
+    async ({ x, y }) => {
       if (bridge.settings.executionMode !== 'cdp') {
         return '当前为 DOM 模式。如需坐标级输入，请在设置中切换到 CDP。';
       }
       return safeJson(
-        await trackAction(() => bridge.cdp.input({ x, y, type: 'click', text })),
+        await trackAction(() => bridge.cdp.input({ x, y, type: 'click' })),
       );
     },
     {
@@ -505,7 +577,6 @@ export async function createAgentTools(bridge: ToolBridge) {
       schema: z.object({
         x: z.number(),
         y: z.number(),
-        text: z.string().optional(),
       }),
     },
   );
@@ -610,6 +681,7 @@ export async function createAgentTools(bridge: ToolBridge) {
     typeText,
     clear,
     select,
+    interact,
     drag,
     press,
     scroll,
@@ -625,6 +697,8 @@ export async function createAgentTools(bridge: ToolBridge) {
     openTab,
     switchTab,
     closeTab,
+    extractInteractions,
+    inspectElementTree,
     namedScript,
     cdpScript,
     cdpClick,

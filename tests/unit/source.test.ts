@@ -38,6 +38,25 @@ describe('getPageSource', () => {
     expect(result.content).not.toContain('pagent-root');
   });
 
+  it('omits bulky executable and presentation bodies from live DOM', async () => {
+    document.body.innerHTML = `
+      <main><button>继续</button></main>
+      <style>.huge { color: red; }</style>
+      <script>window.__largePayload = "${'x'.repeat(2000)}";</script>
+      <svg aria-label="图标"><path d="M0 0 L100 100"></path></svg>
+    `;
+
+    const result = await getPageSource({ type: 'dom' });
+
+    expect(result.content).toContain('<button>继续</button>');
+    expect(result.content).toContain('<style></style>');
+    expect(result.content).toContain('<script></script>');
+    expect(result.content).toContain('<svg aria-label="图标"></svg>');
+    expect(result.content).not.toContain('.huge');
+    expect(result.content).not.toContain('__largePayload');
+    expect(result.content).not.toContain('M0 0');
+  });
+
   it('reads visible text and skips scripts and extension UI', async () => {
     document.body.innerHTML = `
       <p>可见正文 hello@site.com</p>
@@ -115,6 +134,13 @@ describe('getPageSource', () => {
       regex: true,
     });
     expect(regex.matches?.some((item) => item.match.includes('登录'))).toBe(true);
+  });
+
+  it('suggests regex mode when a regex-looking literal has no matches', async () => {
+    document.body.innerHTML = '<input><select></select>';
+    const result = await getPageSource({ type: 'dom', grep: 'input|select' });
+    expect(result.total).toBe(0);
+    expect(result.hint).toContain('regex=true');
   });
 
   it('paginates large text by default and continues from nextOffset', async () => {

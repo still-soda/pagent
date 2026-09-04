@@ -31,6 +31,12 @@ describe('searchPageText', () => {
     expect(searchPageText('HelloPagent', { caseSensitive: true }).total).toBe(1);
   });
 
+  it('searches element ids and names for structural lookup', () => {
+    document.body.innerHTML = '<input id="birthday" name="birthDate" />';
+    expect(searchPageText('birthday').hits[0]).toMatchObject({ tag: 'input' });
+    expect(searchPageText('birthDate').hits[0]).toMatchObject({ tag: 'input' });
+  });
+
   it('skips the extension UI and caps results', () => {
     document.body.innerHTML = `
       <pagent-root><p>Pagent secret</p></pagent-root>
@@ -43,5 +49,20 @@ describe('searchPageText', () => {
     expect(result.count).toBe(2);
     expect(result.truncated).toBe(true);
     expect(result.total).toBeGreaterThan(2);
+  });
+
+  it('can bypass an active interaction context with page scope', () => {
+    document.body.innerHTML = `
+      <p>页面正文里的统计结果</p>
+      <div role="dialog"><button>确定</button></div>
+    `;
+    const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
+    dialog.getBoundingClientRect = () => ({
+      x: 10, y: 10, top: 10, left: 10, right: 210, bottom: 210, width: 200, height: 200,
+      toJSON: () => ({}),
+    });
+
+    expect(searchPageText('统计结果').total).toBe(0);
+    expect(searchPageText('统计结果', { scope: 'page' }).total).toBe(1);
   });
 });
