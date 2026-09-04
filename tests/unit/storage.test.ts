@@ -7,6 +7,7 @@ import {
   loadTabConversations,
   loadTabUi,
   loadVault,
+  listPersistedConversations,
   resetSessionReadyForTests,
   resetSessionStorageForTests,
   savePageConversations,
@@ -102,5 +103,14 @@ describe('IndexedDB session storage', () => {
     await expect(loadVault('example.com')).resolves.toMatchObject({
       conversations: [expect.objectContaining({ title: '标签里的会话' })],
     });
+  });
+
+  it('lists persisted conversations across vaults and live stores', async () => {
+    const docs = storeOf('文档会话', 'docs.example.com');
+    const live = storeOf('当前标签', 'app.example.com');
+    await saveVaultFromStore('https://docs.example.com/guide', docs);
+    await savePageConversations('tab:9', live);
+    const items = await listPersistedConversations();
+    expect(items.map((item) => item.title).sort()).toEqual(['当前标签', '文档会话']);
   });
 });

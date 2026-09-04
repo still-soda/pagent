@@ -5,6 +5,7 @@ import {
   conversationTabKey,
   isSparseStore,
 } from '@/features/agent/session/conversations';
+import { flattenStoredConversations } from '@/features/settings/conversation-archive';
 import {
   idbDelete,
   idbDeleteKeys,
@@ -25,6 +26,7 @@ import { EMPTY_MCP_CONFIG, mcpConfigSchema, type McpConfig } from '@/shared/cont
 import type {
   Checkpoint,
   DomainVault,
+  PageConversation,
   PageConversationStore,
   VaultMap,
 } from '@/shared/contracts/session';
@@ -212,6 +214,28 @@ export async function clearTabUi(tabId: number): Promise<void> {
 export async function loadVault(domain: string): Promise<DomainVault | null> {
   await ensureSessionStorage();
   return (await idbGet<DomainVault>(SESSION_STORES.vaults, domain)) ?? null;
+}
+
+export async function loadPersistedConversationSources(): Promise<{
+  vaults: VaultMap;
+  stores: Record<string, PageConversationStore>;
+}> {
+  await ensureSessionStorage();
+  const [vaults, stores] = await Promise.all([
+    idbGetAll<DomainVault>(SESSION_STORES.vaults),
+    idbGetAll<PageConversationStore>(SESSION_STORES.conversations),
+  ]);
+  return { vaults, stores };
+}
+
+export async function listPersistedConversations(): Promise<PageConversation[]> {
+  const { vaults, stores } = await loadPersistedConversationSources();
+  return flattenStoredConversations(vaults, stores);
+}
+
+export async function getPersistedConversations(ids: string[]): Promise<PageConversation[]> {
+  const wanted = new Set(ids);
+  return (await listPersistedConversations()).filter((item) => wanted.has(item.id));
 }
 
 export async function saveVaultFromStore(

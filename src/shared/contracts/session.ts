@@ -35,6 +35,16 @@ export type DomainVault = {
 
 export type VaultMap = Record<string, DomainVault>;
 
+export type ConversationSummary = {
+  id: string;
+  title: string;
+  vaults: string[];
+  createdAt: number;
+  updatedAt: number;
+  messageCount: number;
+  preview: string;
+};
+
 export type SessionContext = {
   tabId: number;
   sessionTabId?: number;

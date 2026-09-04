@@ -143,6 +143,18 @@ describe('rpc schemas', () => {
     expect(() => parseRpcPayload('teaching.revise', { request: '' })).toThrow();
   });
 
+  it('parses conversation archive payloads', () => {
+    expect(parseRpcPayload('conversations.list', {})).toEqual({});
+    expect(
+      parseRpcPayload('conversations.get', { ids: ['c1', 'c2'], includeImages: true }),
+    ).toEqual({
+      ids: ['c1', 'c2'],
+      includeImages: true,
+    });
+    expect(() => parseRpcPayload('conversations.get', { ids: [] })).toThrow();
+    expect(() => parseRpcPayload('conversations.get', { ids: [''] })).toThrow();
+  });
+
   it('identifies rpc envelopes', () => {
     expect(
       isRpcRequest({

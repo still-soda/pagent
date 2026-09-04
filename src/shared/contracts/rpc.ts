@@ -261,6 +261,11 @@ export const rpcSchemas = {
     deletedConversationIds: z.array(z.string()).optional(),
     url: z.string().optional(),
   }),
+  'conversations.list': z.object({}),
+  'conversations.get': z.object({
+    ids: z.array(z.string().min(1)).min(1).max(200),
+    includeImages: z.boolean().optional(),
+  }),
   'teaching.start': z.object({
     url: z.string().url(),
     conversationId: z.string().optional(),

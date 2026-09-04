@@ -13,6 +13,8 @@ import {
   loadTabUi,
   saveTabUi,
   saveVaultFromStore,
+  getPersistedConversations,
+  loadPersistedConversationSources,
 } from '@/shared/storage/storage';
 import { getPermissionState, requestPermissions } from '@/shared/browser/permissions';
 import {
@@ -45,6 +47,12 @@ import { syncMcpServers } from '@/features/mcp/background/mcp-manager';
 import { saveMcpConfig } from '@/shared/storage/storage';
 import { isSparseStore } from '@/features/agent/session/conversations';
 import { conversationVaultKey } from '@/features/agent/session/vault';
+import {
+  flattenStoredConversations,
+  listVaultSummaries,
+  toConversationSummary,
+  toExportedConversation,
+} from '@/features/settings/conversation-archive';
 import type { AgentSettings } from '@/shared/contracts/settings';
 import type { PageConversationStore } from '@/shared/contracts/session';
 import type { RecordedAction } from '@/shared/contracts/teaching';
@@ -343,6 +351,21 @@ export async function handleRpc(name: RpcName, payload: unknown, senderTabId?: n
         });
       }
       return { ok: true };
+    }
+    case 'conversations.list': {
+      const sources = await loadPersistedConversationSources();
+      const items = flattenStoredConversations(sources.vaults, sources.stores);
+      return {
+        conversations: items.map(toConversationSummary),
+        vaults: listVaultSummaries(sources.vaults),
+      };
+    }
+    case 'conversations.get': {
+      const data = parseRpcPayload('conversations.get', payload);
+      const items = await getPersistedConversations(data.ids);
+      return {
+        conversations: items.map((item) => toExportedConversation(item, { includeImages: data.includeImages })),
+      };
     }
     case 'teaching.start': {
       const data = parseRpcPayload('teaching.start', payload);

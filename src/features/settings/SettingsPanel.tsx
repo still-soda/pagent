@@ -28,6 +28,7 @@ import {
   type ProviderId,
 } from '@/shared/contracts/settings';
 import { MemorySettingsSection } from './MemorySettingsSection';
+import { openDetailedSettings } from './open-options';
 
 async function requestOptionalPermissions(options: {
   debugger?: boolean;
@@ -79,9 +80,11 @@ function SettingRow({
 export function SettingsPanel({
   settings,
   onChange,
+  variant = 'panel',
 }: {
   settings: AgentSettings;
   onChange: (settings: AgentSettings) => void;
+  variant?: 'panel' | 'page';
 }) {
   const [key, setKey] = useState('');
   const [keys, setKeys] = useState<Record<string, boolean>>({});
@@ -244,6 +247,21 @@ export function SettingsPanel({
 
   return (
     <div ref={panelRef} className="space-y-3 text-sm text-ink">
+      {variant === 'panel' && (
+        <button
+          type="button"
+          onClick={() => void openDetailedSettings('archive')}
+          className="flex w-full items-center justify-between gap-3 rounded-card border border-line bg-surface px-3 py-2.5 text-left hover:bg-hover"
+        >
+          <span className="min-w-0">
+            <span className="block text-[12.5px] font-medium text-ink">打开详细设置</span>
+            <span className="mt-0.5 block text-[11.5px] leading-4 text-ink-3">
+              浏览全部站点的聊天记录，并导出为 JSON / Markdown
+            </span>
+          </span>
+          <span aria-hidden className="text-ink-3">→</span>
+        </button>
+      )}
       <section className="space-y-2.5 rounded-card border border-line bg-surface p-3">
         <h3 className="text-xs font-semibold tracking-wide text-ink-2">模型</h3>
         <div className="space-y-1.5">
