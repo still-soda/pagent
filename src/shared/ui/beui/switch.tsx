@@ -45,7 +45,7 @@ export function Switch({
           initial={false}
           whileTap={reduce || disabled ? undefined : { scale: 0.94 }}
           className={cn(
-            'inline-flex h-6 w-10 shrink-0 cursor-pointer items-center justify-start rounded-full px-0.75 outline-none transition-colors',
+            'inline-flex h-6 w-10 shrink-0 cursor-pointer items-center justify-start rounded-full px-1 outline-none transition-colors',
             'focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
             'disabled:cursor-not-allowed disabled:opacity-60',
             checked ? 'bg-primary' : 'bg-muted-foreground/45',
@@ -53,8 +53,8 @@ export function Switch({
         >
           <motion.span
             initial={false}
-            animate={{ x: checked ? 16 : 0 }}
-            className="block size-4.5 rounded-full bg-knob shadow-sm"
+            animate={{ x: checked ? 14 : 0 }}
+            className="block size-4 rounded-full bg-knob shadow-sm"
           />
         </motion.button>
         {label && (
