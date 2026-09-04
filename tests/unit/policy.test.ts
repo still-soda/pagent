@@ -1,13 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { assertNavigableUrl, isRepeatedAction, redactText } from '@/shared/contracts/policy';
+import {
+  assertNavigableUrl,
+  isRepeatedAction,
+  redactText,
+  redactValue,
+} from '@/shared/contracts/policy';
 import { DEFAULT_SETTINGS } from '@/shared/contracts/settings';
 
 describe('redactText', () => {
   it('redacts emails and keys', () => {
-    const text = redactText('contact me@example.com with sk-abcdefghijklmnopqrstuvwxyz');
+    const text = redactText('contact me@example.com or 13812345678 with sk-abcdefghijklmnopqrstuvwxyz');
     expect(text).toContain('[redacted-email]');
     expect(text).toContain('[redacted-key]');
     expect(text).not.toContain('me@example.com');
+    expect(text).toContain('[redacted-phone]');
+  });
+
+  it('redacts nested tool payloads', () => {
+    expect(redactValue({ steps: [{ value: 'me@example.com' }] })).toEqual({
+      steps: [{ value: '[redacted-email]' }],
+    });
   });
 });
 

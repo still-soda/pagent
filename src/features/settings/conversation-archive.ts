@@ -9,6 +9,7 @@ import type {
   VaultMap,
 } from '@/shared/contracts/session';
 import type { ChatMessage, ChatToolCall, TaskRow, TurnUsage } from '@/shared/contracts/session-messages';
+import { redactText, redactValue } from '@/shared/contracts/policy';
 
 export type ConversationTranscriptTurn = {
   id: string;
@@ -133,15 +134,15 @@ export function toTranscriptTurn(
     id: tool.id,
     name: tool.name,
     label: toolLabel(tool.name),
-    args: tool.args,
-    output: tool.output,
+    args: redactValue(tool.args),
+    output: tool.output ? redactText(tool.output) : undefined,
     status: tool.status,
   }));
   return {
     id: message.id,
     role: message.role,
-    text,
-    thinking: thinking || undefined,
+    text: redactText(text),
+    thinking: thinking ? redactText(thinking) : undefined,
     tools: tools.length ? tools : undefined,
     usage: message.usage,
     hasImage: Boolean(message.imageDataUrl),
@@ -162,10 +163,24 @@ export function toExportedConversation(
     createdAtISO: toIso(item.createdAt),
     updatedAtISO: toIso(item.updatedAt),
     messageCount: item.messages.length,
-    budget: item.budget,
+    budget: conversationBudget(item),
     error: item.error || undefined,
-    tasks: item.tasks,
+    tasks: item.tasks.map((task) => ({
+      ...task,
+      detail: task.detail ? redactText(task.detail) : task.detail,
+    })),
     transcript: item.messages.map((message) => toTranscriptTurn(message, options)),
+  };
+}
+
+function conversationBudget(item: PageConversation): { modelCalls: number; toolCalls: number } {
+  const turns = item.messages
+    .map((message) => message.usage)
+    .filter((usage): usage is TurnUsage => Boolean(usage));
+  if (!turns.length) return item.budget;
+  return {
+    modelCalls: turns.reduce((sum, usage) => sum + usage.modelCalls, 0),
+    toolCalls: turns.reduce((sum, usage) => sum + usage.toolCalls, 0),
   };
 }
 

@@ -7,6 +7,7 @@ import type {
   TurnUsage,
 } from '@/shared/contracts/session-messages';
 import { toolLabel } from './tool-display';
+import { redactText, redactValue } from '@/shared/contracts/policy';
 
 export type AssistantBlock =
   | { type: 'thinking'; text: string }
@@ -205,6 +206,7 @@ export function applyAssistantToolStart(
   tool: ChatToolCall,
   id: string,
 ): ChatMessage[] {
+  tool = { ...tool, args: redactValue(tool.args) };
   const existing = messages.find((item) => hasToolId(messageParts(item), tool.id));
   if (existing) {
     const current = messageParts(existing).find(
@@ -237,7 +239,9 @@ export function applyAssistantToolResult(
   status: Extract<TaskStatus, 'done' | 'error'>,
   output: string,
 ): ChatMessage[] {
-  return messages.map((item) => updateAssistantTool(item, id, { status, output }));
+  return messages.map((item) =>
+    updateAssistantTool(item, id, { status, output: redactText(output) }),
+  );
 }
 
 export function applyAssistantUsage(messages: ChatMessage[], usage: TurnUsage, id: string): ChatMessage[] {
@@ -304,7 +308,9 @@ export function toModelMessages(
     if (message.role !== 'user' && message.role !== 'assistant') continue;
     let content = message.content.trim();
     if (!content && message.role === 'assistant') {
-      const tools = messageParts(message).filter((part) => part.type === 'tool');
+      const tools = messageParts(message).filter(
+        (part): part is AssistantToolPart => part.type === 'tool',
+      );
       if (tools.length) content = `已执行：${tools.map((tool) => toolLabel(tool.name)).join('、')}`;
     }
     if (!content) continue;
@@ -320,7 +326,9 @@ export function toModelMessages(
   const lastText =
     typeof last?.content === 'string'
       ? last.content
-      : last?.content.find((part) => part.type === 'text')?.text;
+      : last?.content.find(
+          (part): part is { type: 'text'; text: string } => part.type === 'text',
+        )?.text;
   if (prompt && last?.role === 'user' && lastText === prompt.trim()) {
     converted.pop();
   }

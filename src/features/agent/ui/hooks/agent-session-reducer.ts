@@ -9,6 +9,7 @@ import {
   applyAssistantUsage,
 } from '@/features/agent/session/messages';
 import { nowId } from '@/shared/utils/utils';
+import { redactText } from '@/shared/contracts/policy';
 
 export function patchConversation(
   list: PageConversation[],
@@ -68,8 +69,8 @@ export function applyAgentEventToConversations(
         event.args == null
           ? undefined
           : typeof event.args === 'string'
-            ? event.args
-            : JSON.stringify(event.args);
+            ? redactText(event.args)
+            : redactText(JSON.stringify(event.args));
       return {
         ...item,
         messages: applyAssistantToolStart(item.messages, tool, nowId('m')),
@@ -107,7 +108,7 @@ export function applyAgentEventToConversations(
           ? {
               ...task,
               status: event.type === 'tool-end' ? 'done' : 'error',
-              detail: event.output,
+              detail: redactText(event.output),
             }
           : task,
       ),

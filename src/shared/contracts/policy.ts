@@ -10,6 +10,7 @@ const SENSITIVE_PATH = /(password|passwd|payment|checkout|wallet|bank|2fa|otp)/i
 
 const SECRET_PATTERNS: Array<[RegExp, string]> = [
   [/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]'],
+  [/\b1[3-9]\d{9}\b/g, '[redacted-phone]'],
   [/\b(?:sk|rk|pk|ak)-[A-Za-z0-9_-]{16,}\b/g, '[redacted-key]'],
   [/\b(?:AIza|ya29|ghp_|github_pat_)[A-Za-z0-9_\-]{10,}\b/g, '[redacted-token]'],
   [/\b\d{13,19}\b/g, '[redacted-number]'],
@@ -20,6 +21,17 @@ export function redactText(text: string): string {
     (value, [pattern, replacement]) => value.replace(pattern, replacement),
     text,
   );
+}
+
+export function redactValue<T>(value: T): T {
+  if (typeof value === 'string') return redactText(value) as T;
+  if (Array.isArray(value)) return value.map((item) => redactValue(item)) as T;
+  if (!value || typeof value !== 'object') return value;
+  const redacted = Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .map(([key, item]) => [key, redactValue(item)]),
+  );
+  return redacted as T;
 }
 
 export function sanitizeUrl(raw: string): string {

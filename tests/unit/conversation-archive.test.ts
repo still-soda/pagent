@@ -99,6 +99,37 @@ describe('conversation archive', () => {
     expect(withImage.transcript[1]?.imageDataUrl).toBe('data:image/png;base64,abc');
   });
 
+  it('aggregates turn budgets and redacts archived tool data', () => {
+    const item = filled('隐私', ['example.com'], '联系 13812345678');
+    item.budget = { modelCalls: 1, toolCalls: 0 };
+    item.messages.push({
+      id: 'm2',
+      role: 'assistant',
+      content: '已填写 me@example.com',
+      tools: [{
+        id: 't1',
+        name: 'type_text',
+        status: 'done',
+        args: { text: 'me@example.com' },
+        output: '{"value":"13812345678"}',
+      }],
+      usage: {
+        inputTokens: 10,
+        outputTokens: 2,
+        totalTokens: 12,
+        cachedTokens: 0,
+        reasoningTokens: 0,
+        durationMs: 100,
+        modelCalls: 4,
+        toolCalls: 7,
+      },
+    });
+    const exported = toExportedConversation(item);
+    expect(exported.budget).toEqual({ modelCalls: 4, toolCalls: 7 });
+    expect(JSON.stringify(exported)).not.toContain('me@example.com');
+    expect(JSON.stringify(exported)).not.toContain('13812345678');
+  });
+
   it('writes JSON, JSONL and Markdown that keep the task text', () => {
     const item = filled('导出样本', ['example.com'], '总结这个页面');
     item.messages.push({

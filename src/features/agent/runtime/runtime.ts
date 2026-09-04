@@ -9,6 +9,7 @@ import { loadSecrets, loadSettings } from '@/shared/storage/storage';
 import { toUserErrorMessage } from '@/shared/contracts/errors';
 import { toolLabel } from '@/features/agent/session/tool-display';
 import { nowId } from '@/shared/utils/utils';
+import { redactText } from '@/shared/contracts/policy';
 import {
   applyAssistantThinking,
   applyAssistantToken,
@@ -185,8 +186,8 @@ export async function runAgent(options: {
             event.args == null
               ? existing?.detail
               : typeof event.args === 'string'
-                ? event.args
-                : JSON.stringify(event.args);
+                ? redactText(event.args)
+                : redactText(JSON.stringify(event.args));
           if (existing) {
             const nextDetail =
               argsDetail && argsDetail !== '{}' && argsDetail !== '[]' ? argsDetail : existing.detail;
@@ -222,7 +223,7 @@ export async function runAgent(options: {
           const task = tasks.find((item) => item.id === event.id);
           if (task) {
             task.status = event.type === 'tool-end' ? 'done' : 'error';
-            task.detail = event.output;
+            task.detail = redactText(event.output);
           }
           messages = applyAssistantToolResult(
             messages,
