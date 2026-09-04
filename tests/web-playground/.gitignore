@@ -8,16 +8,9 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-.output
 dist
-test-results
-playwright-report
-blob-report
-stats.html
-stats-*.json
-.wxt
-.improve
-web-ext.config.ts
+dist-ssr
+*.local
 
 # Editor directories and files
 .vscode/*
