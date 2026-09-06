@@ -85,6 +85,7 @@ describe('live session presence', () => {
       id: 't1',
       name: 'page.info',
       output: '完成',
+      elapsedMs: 1800,
     });
     store = applyAgentEventToStore(store, conversation.id, {
       type: 'usage',
@@ -109,6 +110,7 @@ describe('live session presence', () => {
     expect(store.conversations[0]?.messages[0]).toMatchObject({
       content: '刷新期间生成的回答',
       usage: { totalTokens: 48, cachedTokens: 16, durationMs: 1800 },
+      tools: [{ id: 't1', status: 'done', output: '完成', elapsedMs: 1800 }],
     });
   });
 });

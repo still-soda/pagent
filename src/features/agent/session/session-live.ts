@@ -100,7 +100,7 @@ export function applyAgentEventToStore(
       const status = event.type === 'tool-end' ? 'done' : 'error';
       next = {
         ...item,
-        messages: applyAssistantToolResult(item.messages, event.id, status, event.output),
+        messages: applyAssistantToolResult(item.messages, event.id, status, event.output, event.elapsedMs),
         tasks: item.tasks.map((task) =>
           task.id === event.id ? { ...task, status, detail: event.output } : task,
         ),

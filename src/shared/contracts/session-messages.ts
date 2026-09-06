@@ -15,6 +15,8 @@ export type ChatToolCall = {
   args?: unknown;
   output?: string;
   status: TaskStatus;
+  /** 从任务开始到本次调用结束的累计耗时（毫秒）。 */
+  elapsedMs?: number;
 };
 
 export type AssistantTextPart = { type: 'text'; text: string };

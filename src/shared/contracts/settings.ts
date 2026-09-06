@@ -283,9 +283,6 @@ export type AgentSettings = {
   screenshotAsImage: boolean;
   captureDevtools: boolean;
   disabledBuiltinTools: string[];
-  maxModelCalls: number;
-  maxToolCalls: number;
-  maxDurationMs: number;
   theme: 'light' | 'dark' | 'system';
 };
 
@@ -320,8 +317,5 @@ export const DEFAULT_SETTINGS: AgentSettings = {
   screenshotAsImage: true,
   captureDevtools: true,
   disabledBuiltinTools: [],
-  maxModelCalls: 24,
-  maxToolCalls: 40,
-  maxDurationMs: 8 * 60 * 1000,
   theme: 'system',
 };

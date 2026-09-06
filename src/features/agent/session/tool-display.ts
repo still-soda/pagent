@@ -1,4 +1,5 @@
 import { truncate } from '@/shared/utils/utils';
+import { formatDuration } from '@/features/agent/runtime/usage';
 
 export type ToolVisualKind =
   | 'observe'
@@ -211,6 +212,18 @@ export function toolChip(name: string, args?: unknown, status?: string): string 
   }
 }
 
+/** 任务已耗时的展示行；没有计时数据时返回空串。 */
+export function toolElapsedLine(elapsedMs?: number): string {
+  if (typeof elapsedMs !== 'number' || !Number.isFinite(elapsedMs) || elapsedMs <= 0) return '';
+  return `当前任务已耗时 ${formatDuration(elapsedMs)}，请注意控制时间。`;
+}
+
+/** 结果正文里已经带过耗时行时先剥掉，避免面板上重复显示。 */
+export function stripElapsedLine(output?: string): string {
+  if (!output) return '';
+  return output.replace(/^当前任务已耗时[^\n]*\r?\n?/, '');
+}
+
 export function toolUsesMono(name: string): boolean {
   return toolKind(name) === 'script';
 }
@@ -236,17 +249,25 @@ export function formatToolArgs(args?: unknown): string[] {
   return line ? [line] : [];
 }
 
-export function toolDetailLines(args?: unknown, output?: string, status?: string): string[] {
-  if (output) {
-    const line = compactText(output);
-    return line ? [line] : [];
+export function toolDetailLines(
+  args?: unknown,
+  output?: string,
+  status?: string,
+  elapsedMs?: number,
+): string[] {
+  // 耗时行排在结果正文之前
+  const elapsed = toolElapsedLine(elapsedMs);
+  const body = stripElapsedLine(output);
+  if (body) {
+    const line = compactText(body);
+    return line ? [elapsed, line].filter(Boolean) : elapsed ? [elapsed] : [];
   }
   if (status === 'running' || status === 'pending') {
-    return [compactArgs(args) || '正在执行…'];
+    return [elapsed, compactArgs(args) || '正在执行…'].filter(Boolean);
   }
   if (status === 'error') {
-    return ['调用失败'];
+    return [elapsed, '调用失败'].filter(Boolean);
   }
   const argsLine = compactArgs(args);
-  return argsLine ? [argsLine] : [];
+  return [elapsed, argsLine].filter(Boolean);
 }

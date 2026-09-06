@@ -117,6 +117,7 @@ export function applyAgentEventToConversations(
         event.id,
         event.type === 'tool-end' ? 'done' : 'error',
         event.output,
+        event.elapsedMs,
       ),
     }));
   }

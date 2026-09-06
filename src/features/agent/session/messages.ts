@@ -104,7 +104,7 @@ export function appendAssistantTool(message: ChatMessage, tool: ChatToolCall): C
 export function updateAssistantTool(
   message: ChatMessage,
   id: string,
-  patch: Partial<Pick<ChatToolCall, 'status' | 'output' | 'args' | 'name'>>,
+  patch: Partial<Pick<ChatToolCall, 'status' | 'output' | 'args' | 'name' | 'elapsedMs'>>,
 ): ChatMessage {
   const parts = messageParts(message);
   if (!hasToolId(parts, id)) return message;
@@ -238,9 +238,14 @@ export function applyAssistantToolResult(
   id: string,
   status: Extract<TaskStatus, 'done' | 'error'>,
   output: string,
+  elapsedMs?: number,
 ): ChatMessage[] {
   return messages.map((item) =>
-    updateAssistantTool(item, id, { status, output: redactText(output) }),
+    updateAssistantTool(item, id, {
+      status,
+      output: redactText(output),
+      ...(elapsedMs == null ? {} : { elapsedMs }),
+    }),
   );
 }
 

@@ -5,8 +5,8 @@ export type AgentEvent =
   | { type: 'reasoning'; text: string }
   | { type: 'thinking'; text: string }
   | { type: 'tool-start'; id: string; name: string; args: unknown }
-  | { type: 'tool-end'; id: string; name: string; output: string }
-  | { type: 'tool-error'; id: string; name: string; output: string }
+  | { type: 'tool-end'; id: string; name: string; output: string; elapsedMs?: number }
+  | { type: 'tool-error'; id: string; name: string; output: string; elapsedMs?: number }
   | { type: 'message'; content: string }
   | { type: 'status'; text: string }
   | { type: 'budget'; modelCalls: number; toolCalls: number }

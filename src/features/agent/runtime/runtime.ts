@@ -69,9 +69,6 @@ export async function runAgent(options: {
       }),
     onStatus: (text) => options.emit({ type: 'thinking', text }),
     onUsage: () => emitUsage(),
-    maxModelCalls: settings.maxModelCalls,
-    maxToolCalls: settings.maxToolCalls,
-    maxDurationMs: settings.maxDurationMs,
   });
 
   emitUsage = () => {
@@ -94,10 +91,9 @@ export async function runAgent(options: {
     middleware: [safety.middleware],
   });
   const tasks: TaskRow[] = [];
-  const recursionLimit = Math.max(
-    50,
-    (settings.maxModelCalls + settings.maxToolCalls) * 2 + 10,
-  );
+  // 模型/工具调用与任务时长均不设上限；防死循环由中间件的重复动作检测与
+  // 无进展策略切换兜底，这里仅保留一个宽松的递归步数硬上限。
+  const recursionLimit = 500;
   const CHECKPOINT_INTERVAL_MS = 750;
   let checkpointTimer: ReturnType<typeof setTimeout> | undefined;
   let checkpointQueue: Promise<unknown> = Promise.resolve();
@@ -220,18 +216,16 @@ export async function runAgent(options: {
           continue;
         }
         if (event.type === 'tool-end' || event.type === 'tool-error') {
+          const status = event.type === 'tool-end' ? 'done' : 'error';
+          // 任务已耗时：从本次任务启动到该工具返回结果的累计时间
+          const elapsedMs = Math.max(0, Date.now() - safety.usage.startedAt);
           const task = tasks.find((item) => item.id === event.id);
           if (task) {
-            task.status = event.type === 'tool-end' ? 'done' : 'error';
+            task.status = status;
             task.detail = redactText(event.output);
           }
-          messages = applyAssistantToolResult(
-            messages,
-            event.id,
-            event.type === 'tool-end' ? 'done' : 'error',
-            event.output,
-          );
-          options.emit(event);
+          messages = applyAssistantToolResult(messages, event.id, status, event.output, elapsedMs);
+          options.emit({ ...event, elapsedMs });
           continue;
         }
         if (event.type === 'usage') {

@@ -60,7 +60,7 @@ export function AssistantMessage({
               icon: toolKind(tool.name),
               mono: toolUsesMono(tool.name),
               detailMono: true,
-              detail: toolDetailLines(tool.args, tool.output, tool.status),
+              detail: toolDetailLines(tool.args, tool.output, tool.status, tool.elapsedMs),
               status: tool.status,
             }))}
           />

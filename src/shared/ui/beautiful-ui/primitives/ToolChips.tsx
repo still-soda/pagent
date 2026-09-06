@@ -286,7 +286,7 @@ export default function ToolChips({
               >
                 <div className="min-h-0 overflow-hidden">
                   <div className="mt-0.5 mb-1 ml-2 flex min-w-0 flex-col gap-0.5 border-l border-line py-0.5 pl-3.5">
-                    {row.detail.length > 0 ? row.detail.slice(0, 1).map((line, lineIndex) => (
+                    {row.detail.length > 0 ? row.detail.slice(0, 2).map((line, lineIndex) => (
                       <span
                         key={`${row.key}-${lineIndex}`}
                         className={`block min-w-0 truncate text-[11.5px] leading-[1.6] ${row.detailMono ? "font-mono" : ""} ${line.tone === "add" ? "text-green" : "text-ink-2"}`}

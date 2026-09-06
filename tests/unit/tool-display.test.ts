@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toolChip, toolDetailLines, toolKind, toolLabel, toolUsesMono } from '@/features/agent/session/tool-display';
+import { toolChip, toolDetailLines, toolElapsedLine, toolKind, toolLabel, toolUsesMono } from '@/features/agent/session/tool-display';
 
 describe('tool display', () => {
   it('gives each built-in tool a Chinese label', () => {
@@ -37,5 +37,29 @@ describe('tool display', () => {
     expect(toolDetailLines(undefined, '第一行\n第二行', 'done')).toEqual(['第一行 第二行']);
     expect(toolDetailLines(undefined, undefined, 'error')).toEqual(['调用失败']);
     expect(toolDetailLines(undefined, undefined, 'running')).toEqual(['正在执行…']);
+  });
+
+  it('puts the elapsed task time on its own line before a result', () => {
+    expect(toolElapsedLine(undefined)).toBe('');
+    expect(toolElapsedLine(0)).toBe('');
+    expect(toolElapsedLine(-5)).toBe('');
+    expect(toolElapsedLine(Number.NaN)).toBe('');
+    expect(toolElapsedLine(420)).toBe('当前任务已耗时 420ms，请注意控制时间。');
+    expect(toolElapsedLine(3_200)).toBe('当前任务已耗时 3.2s，请注意控制时间。');
+    expect(toolElapsedLine(65_000)).toBe('当前任务已耗时 1m 5s，请注意控制时间。');
+
+    expect(toolDetailLines({}, '标题：首页', 'done', 3_200)).toEqual([
+      '当前任务已耗时 3.2s，请注意控制时间。',
+      '标题：首页',
+    ]);
+    // 结果正文里已经带过耗时行时不再重复
+    expect(toolDetailLines({}, '当前任务已耗时 3.2s\n标题：首页', 'done', 3_200)).toEqual([
+      '当前任务已耗时 3.2s，请注意控制时间。',
+      '标题：首页',
+    ]);
+    expect(toolDetailLines(undefined, undefined, 'error', 1_500)).toEqual([
+      '当前任务已耗时 1.5s，请注意控制时间。',
+      '调用失败',
+    ]);
   });
 });
