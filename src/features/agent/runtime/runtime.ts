@@ -1,6 +1,6 @@
 import { createAgent } from 'langchain';
 import { createChatModel } from './models';
-import { createSafetyMiddleware } from './middleware';
+import { createSafetyMiddleware, raceAbort, withAbort } from './middleware';
 import { createAgentTools, type ToolBridge } from './tools/index';
 import { buildSystemPrompt } from './prompts';
 import { checkpointKey, clearCheckpoint, saveCheckpoint } from '@/features/agent/session/checkpoint';
@@ -136,27 +136,31 @@ export async function runAgent(options: {
   options.emit({ type: 'thinking', text: '正在调用模型…' });
 
   try {
-    const stream = await agent.stream(
-      {
-        messages: [
-          ...toModelMessages(history, options.prompt),
-          {
-            role: 'user',
-            content: modelUserContent(options.prompt, options.imageDataUrl),
-          },
-        ],
-      },
-      {
-        signal: options.signal,
-        streamMode: ['messages', 'updates'],
-        recursionLimit,
-      },
+    const stream = await raceAbort(
+      options.signal,
+      agent.stream(
+        {
+          messages: [
+            ...toModelMessages(history, options.prompt),
+            {
+              role: 'user',
+              content: modelUserContent(options.prompt, options.imageDataUrl),
+            },
+          ],
+        },
+        {
+          signal: options.signal,
+          streamMode: ['messages', 'updates'],
+          recursionLimit,
+        },
+      ),
     );
 
     let assistant = '';
     let reasoning = '';
     const streamTools = createStreamToolState();
-    for await (const chunk of stream) {
+    // withAbort：终止时立即抛出并关闭底层流，不等下一个 chunk（模型静默期也能立即中断）
+    for await (const chunk of withAbort(options.signal, stream)) {
       if (options.signal.aborted) throw new Error('任务已停止');
       for (const event of interpretStreamChunk(chunk, streamTools)) {
         if (event.type === 'reasoning') {

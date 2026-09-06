@@ -33,7 +33,7 @@ function abortedError(): Error {
 }
 
 /** 与 abort signal 竞速：终止时立即以 AbortError 拒绝，不再等待底层调用自然返回。 */
-function raceAbort<T>(signal: AbortSignal | undefined, promise: PromiseLike<T> | T): Promise<T> {
+export function raceAbort<T>(signal: AbortSignal | undefined, promise: PromiseLike<T> | T): Promise<T> {
   if (!signal) return Promise.resolve(promise);
   if (signal.aborted) return Promise.reject(abortedError());
   return new Promise<T>((resolve, reject) => {
@@ -45,6 +45,23 @@ function raceAbort<T>(signal: AbortSignal | undefined, promise: PromiseLike<T> |
     };
     Promise.resolve(promise).then(settle(resolve), settle(reject));
   });
+}
+
+/**
+ * 包装异步迭代器：终止时立即抛出（不等下一个 chunk），并调用 return() 关闭底层流。
+ * 解决模型静默期（长时间不出 chunk，如推理模型思考）无法中断的问题。
+ */
+export async function* withAbort<T>(signal: AbortSignal, iterable: AsyncIterable<T>): AsyncGenerator<T> {
+  const iterator = iterable[Symbol.asyncIterator]();
+  try {
+    for (;;) {
+      const next = await raceAbort(signal, iterator.next());
+      if (next.done) return;
+      yield next.value;
+    }
+  } finally {
+    await iterator.return?.().catch(() => undefined);
+  }
 }
 
 function prependToContent(content: unknown, prefix: string): unknown {

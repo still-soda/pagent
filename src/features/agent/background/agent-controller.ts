@@ -194,7 +194,8 @@ export async function startAgent(
     if (isCurrent()) running.delete(control.tabId);
     endBusyKeepAlive();
   });
-  void done;
+  // 用户主动终止时 runAgent 会以 AbortError 拒绝，属预期路径，吞掉避免未处理 rejection
+  void done.catch(() => undefined);
   return { ok: true, tabId };
 }
 
