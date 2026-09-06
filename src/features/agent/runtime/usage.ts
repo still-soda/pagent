@@ -218,6 +218,12 @@ function formatInputTokens(usage: TurnUsage): string {
   return `输入 ${formatTokenCount(usage.inputTokens)}${cache}`;
 }
 
+export function formatCacheHitRate(usage: TurnUsage): string | undefined {
+  if (usage.inputTokens <= 0) return undefined;
+  const rate = Math.min(100, Math.max(0, Math.round((usage.cachedTokens / usage.inputTokens) * 100)));
+  return `缓存命中率 ${rate}%`;
+}
+
 export function formatTurnUsageParts(usage: TurnUsage): string[] {
   const parts: string[] = [];
   if (usage.inputTokens > 0 || usage.cachedTokens > 0) parts.push(formatInputTokens(usage));
@@ -225,7 +231,8 @@ export function formatTurnUsageParts(usage: TurnUsage): string[] {
   if (!usage.inputTokens && !usage.outputTokens && !usage.cachedTokens && usage.totalTokens > 0) {
     parts.push(`${formatTokenCount(usage.totalTokens)} token`);
   }
-  if ((usage.reasoningTokens ?? 0) > 0) parts.push(`推理 ${formatTokenCount(usage.reasoningTokens ?? 0)}`);
+  const cacheHit = formatCacheHitRate(usage);
+  if (cacheHit) parts.push(cacheHit);
   if (usage.durationMs > 0) parts.push(formatDuration(usage.durationMs));
   if (usage.modelCalls > 1) parts.push(`${usage.modelCalls} 次模型`);
   if (usage.toolCalls > 0) parts.push(`${usage.toolCalls} 次工具`);

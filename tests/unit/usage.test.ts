@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   extractTurnUsage,
+  formatCacheHitRate,
   formatDuration,
   formatTokenCount,
   formatTurnUsageParts,
@@ -108,9 +109,11 @@ describe('turn usage', () => {
     expect(usage.durationMs).toBe(2_400);
     expect(hasTurnUsage(usage)).toBe(true);
     expect(formatDuration(usage.durationMs)).toBe('2.4s');
+    expect(formatCacheHitRate(usage)).toBe('缓存命中率 78%');
     expect(formatTurnUsageParts(usage)).toEqual([
       '输入 1.02K (缓存 800)',
       '输出 256',
+      '缓存命中率 78%',
       '2.4s',
       '2 次模型',
       '3 次工具',
@@ -125,7 +128,7 @@ describe('turn usage', () => {
         modelCalls: 1,
         toolCalls: 0,
       }),
-    ).toEqual(['输入 40', '输出 6']);
+    ).toEqual(['输入 40', '输出 6', '缓存命中率 0%']);
   });
 
   it('formats token counts with K and M units', () => {
