@@ -30,6 +30,32 @@ import { queryMemory, writeMemory } from '@/features/memory/service';
 
 const CONTENT_FILE = '/content-scripts/content.js';
 
+const LOAD_TIMEOUT_MS = 15_000;
+
+function waitForTabComplete(tabId: number, timeoutMs = LOAD_TIMEOUT_MS): Promise<void> {
+  return new Promise((resolve) => {
+    const cleanup = () => {
+      clearTimeout(timer);
+      browser.tabs.onUpdated.removeListener(onUpdated);
+      resolve();
+    };
+    const onUpdated = (id: number, info: { status?: string }) => {
+      if (id === tabId && info.status === 'complete') cleanup();
+    };
+    const timer = setTimeout(cleanup, timeoutMs);
+    browser.tabs.onUpdated.addListener(onUpdated);
+  });
+}
+
+async function pingContentScript(tabId: number): Promise<boolean> {
+  try {
+    await browser.tabs.sendMessage(tabId, { channel: CHANNEL, kind: 'ping' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function sendToContent<T>(tabId: number, name: string, payload: unknown = {}): Promise<T> {
   await ensureContentScript(tabId);
   const response = await browser.tabs.sendMessage(tabId, {
@@ -45,15 +71,16 @@ export async function sendToContent<T>(tabId: number, name: string, payload: unk
 }
 
 export async function ensureContentScript(tabId: number): Promise<void> {
-  try {
-    await browser.tabs.sendMessage(tabId, { channel: CHANNEL, kind: 'ping' });
-    return;
-  } catch {
-    // inject
-  }
+  if (await pingContentScript(tabId)) return;
   const tab = await browser.tabs.get(tabId);
   if (!tab.url || isProtectedUrl(tab.url)) {
     throw new Error('当前页面受浏览器保护，无法注入 Agent');
+  }
+  // 页面仍在加载时，manifest 注册的 content script 会在 document_idle 自动注入。
+  // 此时强行 executeScript 会造成双注入，先等加载完成后再次 ping。
+  if (tab.status !== 'complete') {
+    await waitForTabComplete(tabId);
+    if (await pingContentScript(tabId)) return;
   }
   await browser.scripting.executeScript({
     target: { tabId },

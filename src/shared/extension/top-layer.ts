@@ -56,13 +56,21 @@ export function promoteHostToTopLayer(host: HTMLElement) {
   showAsManualPopover(host);
 }
 
+// 全页只允许一个顶层 host。若因重复注入出现多个实例，后来的实例必须退出，
+// 否则两个 MutationObserver 会互相把对方挤下 lastElementChild，形成无限 append 循环。
+let activeTopLayerHost: HTMLElement | null = null;
+
 export function attachTopLayer(host: HTMLElement): () => void {
   let placing = false;
+  let scheduled = false;
   let observedParent: Element | null = null;
+
+  const isSuperseded = () =>
+    activeTopLayerHost !== null && activeTopLayerHost !== host && activeTopLayerHost.isConnected;
 
   const observer = new MutationObserver(() => {
     const parent = topLayerParent();
-    if (host.parentElement !== parent || parent.lastElementChild !== host) place();
+    if (host.parentElement !== parent || parent.lastElementChild !== host) schedulePlace();
   });
 
   const observeParent = (parent: Element) => {
@@ -73,7 +81,14 @@ export function attachTopLayer(host: HTMLElement): () => void {
   };
 
   const place = () => {
+    scheduled = false;
     if (placing || !host.isConnected) return;
+    if (isSuperseded()) {
+      observer.disconnect();
+      host.remove();
+      return;
+    }
+    activeTopLayerHost = host;
     placing = true;
     try {
       observeParent(topLayerParent());
@@ -83,12 +98,19 @@ export function attachTopLayer(host: HTMLElement): () => void {
     }
   };
 
+  // 用微任务去抖，避免 observer 回调里同步 append 反复触发自身/其他 observer。
+  const schedulePlace = () => {
+    if (scheduled || placing) return;
+    scheduled = true;
+    queueMicrotask(place);
+  };
+
   place();
 
-  const onFullscreen = () => place();
+  const onFullscreen = () => schedulePlace();
   const onToggle = (event: Event) => {
     const next = 'newState' in event ? String((event as { newState?: string }).newState) : '';
-    if (next === 'closed') queueMicrotask(place);
+    if (next === 'closed') schedulePlace();
   };
 
   document.addEventListener('fullscreenchange', onFullscreen);
@@ -96,6 +118,7 @@ export function attachTopLayer(host: HTMLElement): () => void {
 
   return () => {
     observer.disconnect();
+    if (activeTopLayerHost === host) activeTopLayerHost = null;
     document.removeEventListener('fullscreenchange', onFullscreen);
     host.removeEventListener('toggle', onToggle);
   };

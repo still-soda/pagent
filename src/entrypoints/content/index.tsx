@@ -17,6 +17,16 @@ import { pageChangeTracker } from '@/features/page/change-tracker';
 
 let currentPageHidden = false;
 
+const INSTALLED_FLAG = '__pagentContentInstalled';
+
+function alreadyInstalled(): boolean {
+  const scope = window as unknown as Record<string, unknown>;
+  if (scope[INSTALLED_FLAG]) return true;
+  if (document.querySelector('pagent-root')) return true;
+  scope[INSTALLED_FLAG] = true;
+  return false;
+}
+
 function persistPanelOpen(open: boolean) {
   void rpc('session.setUi', { panelOpen: open });
 }
@@ -123,6 +133,10 @@ export default defineContentScript({
   runAt: 'document_idle',
 
   async main(ctx) {
+    // 单例保护：manifest 注入与程序化补注入可能并发，重复 main() 会导致
+    // 多个 pagent-root 的顶层 observer 互抢 DOM 末位，卡死渲染进程。
+    if (alreadyInstalled()) return;
+
     browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (message?.channel !== CHANNEL) return;
       if (message.kind === 'ping') {
