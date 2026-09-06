@@ -85,10 +85,11 @@ export function applyTokenDelta(previous: string, incoming: string): { next: str
 
 export type StreamToolState = {
   pending: Map<string, { id?: string; name?: string; args: string }>;
+  published: Map<string, string>;
 };
 
 export function createStreamToolState(): StreamToolState {
-  return { pending: new Map() };
+  return { pending: new Map(), published: new Map() };
 }
 
 export function interpretStreamChunk(chunk: unknown, state?: StreamToolState): AgentEvent[] {
@@ -229,6 +230,31 @@ function normalizeToolArgs(args: unknown): unknown {
   }
 }
 
+function argsFingerprint(args: unknown): string {
+  if (args == null) return '';
+  if (typeof args === 'string') return args;
+  try {
+    return JSON.stringify(args);
+  } catch {
+    return String(args);
+  }
+}
+
+function isConcreteArgs(args: unknown): boolean {
+  if (args == null) return false;
+  if (typeof args === 'string') {
+    const trimmed = args.trim();
+    if (!trimmed) return false;
+    try {
+      JSON.parse(trimmed);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return typeof args === 'object';
+}
+
 function collectToolStarts(record: Record<string, unknown>, events: AgentEvent[], state?: StreamToolState) {
   const emitted = new Set<string>();
   const emit = (id?: unknown, name?: unknown, args?: unknown, replace = false) => {
@@ -236,8 +262,18 @@ function collectToolStarts(record: Record<string, unknown>, events: AgentEvent[]
     const sid = String(id);
     const sname = String(name);
     if (!sid || !sname || (!replace && emitted.has(sid))) return;
+    const normalized = normalizeToolArgs(args);
+    if (state) {
+      const fingerprint = `${sname}\0${argsFingerprint(normalized)}`;
+      const prev = state.published.get(sid);
+      if (prev === fingerprint) return;
+      // 参数流式拼接过程中只在「首次亮相」和「JSON 拼完整」时对外发事件，
+      // 避免每个 token 都走一遍 runtime / store / UI。
+      if (prev != null && !isConcreteArgs(normalized)) return;
+      state.published.set(sid, fingerprint);
+    }
     emitted.add(sid);
-    events.push({ type: 'tool-start', id: sid, name: sname, args: normalizeToolArgs(args) });
+    events.push({ type: 'tool-start', id: sid, name: sname, args: normalized });
   };
 
   const chunks = [...asToolCallList(record.tool_call_chunks), ...asToolCallList(record.toolCallChunks)];
