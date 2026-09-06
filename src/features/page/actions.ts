@@ -30,6 +30,7 @@ export async function clickElement(elementId: string, revision?: number) {
   const el = pageObserver.getElement(elementId, revision);
   const before = observedState(pageObserver.describe(el));
   highlight(el);
+  dispatchHoverPrelude(el);
   dispatchPointerPrelude(el);
   asHtml(el).click();
   await settleInteraction();
@@ -53,7 +54,7 @@ export function dblclickElement(elementId: string, revision?: number) {
 export function hoverElement(elementId: string, revision?: number) {
   const el = pageObserver.getElement(elementId, revision);
   highlight(el);
-  el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true, view: window }));
+  dispatchHoverPrelude(el);
   return { ok: true, elementId };
 }
 
@@ -671,6 +672,29 @@ function dispatchPointerPrelude(element: Element): void {
   }
   element.dispatchEvent(new MouseEvent('mousedown', init));
   element.dispatchEvent(new MouseEvent('mouseup', init));
+}
+
+/**
+ * 派发完整 hover 事件序列（pointerover/pointerenter/pointermove +
+ * mouseover/mouseenter/mousemove），使依赖悬停展开的菜单、提示等
+ * 在点击前先进入 hover 状态。
+ */
+function dispatchHoverPrelude(element: Element): void {
+  const rect = element.getBoundingClientRect();
+  const init = {
+    bubbles: true,
+    cancelable: true,
+    clientX: rect.left + rect.width / 2,
+    clientY: rect.top + rect.height / 2,
+  };
+  if (typeof PointerEvent !== 'undefined') {
+    element.dispatchEvent(new PointerEvent('pointerover', { ...init, pointerType: 'mouse' }));
+    element.dispatchEvent(new PointerEvent('pointerenter', { ...init, bubbles: false, pointerType: 'mouse' }));
+    element.dispatchEvent(new PointerEvent('pointermove', { ...init, pointerType: 'mouse' }));
+  }
+  element.dispatchEvent(new MouseEvent('mouseover', init));
+  element.dispatchEvent(new MouseEvent('mouseenter', { ...init, bubbles: false }));
+  element.dispatchEvent(new MouseEvent('mousemove', init));
 }
 
 function nearestScroller(element: Element): HTMLElement | Window {
