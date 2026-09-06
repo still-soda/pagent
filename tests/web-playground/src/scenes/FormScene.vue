@@ -112,7 +112,7 @@ function resetForm() {
       <template #header>
         <div class="card-header">
           <span>技术沙龙报名</span>
-          <el-tag type="info" size="small">表单演练</el-tag>
+          <el-tag type="info" size="small">第 12 期</el-tag>
         </div>
       </template>
 
@@ -355,6 +355,7 @@ function resetForm() {
   flex-direction: column;
   gap: 16px;
   max-width: 860px;
+  margin-inline: auto;
 }
 
 .form-card,
