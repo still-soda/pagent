@@ -26,6 +26,27 @@ export function toolFailureContent(name: string, error: unknown): string {
   return `工具「${toolLabel(name)}」调用失败：${toErrorMessage(error)}。请根据错误调整后重试，或换一种做法。`;
 }
 
+function abortedError(): Error {
+  const error = new Error('任务已停止');
+  error.name = 'AbortError';
+  return error;
+}
+
+/** 与 abort signal 竞速：终止时立即以 AbortError 拒绝，不再等待底层调用自然返回。 */
+function raceAbort<T>(signal: AbortSignal | undefined, promise: PromiseLike<T> | T): Promise<T> {
+  if (!signal) return Promise.resolve(promise);
+  if (signal.aborted) return Promise.reject(abortedError());
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(abortedError());
+    signal.addEventListener('abort', onAbort, { once: true });
+    const settle = (fn: (value: T) => void) => (value: T) => {
+      signal.removeEventListener('abort', onAbort);
+      fn(value);
+    };
+    Promise.resolve(promise).then(settle(resolve), settle(reject));
+  });
+}
+
 function prependToContent(content: unknown, prefix: string): unknown {
   if (typeof content === 'string') return prefix + content;
   if (!Array.isArray(content)) return undefined;
@@ -61,6 +82,7 @@ export function createSafetyMiddleware(options: {
   onBudget?: (usage: UsageState) => void;
   onStatus?: (text: string) => void;
   onUsage?: (usage: UsageState) => void;
+  signal?: AbortSignal;
 }) {
   const usage: UsageState = {
     modelCalls: 0,
@@ -77,7 +99,7 @@ export function createSafetyMiddleware(options: {
       usage.modelCalls += 1;
       options.onBudget?.(usage);
       options.onStatus?.('正在调用模型…');
-      const result = await handler(request);
+      const result = await raceAbort(options.signal, handler(request));
       const extracted = extractTurnUsage(result);
       if (extracted) usage.tokens = mergeTurnUsage(usage.tokens, extracted);
       options.onUsage?.(usage);
@@ -95,14 +117,9 @@ export function createSafetyMiddleware(options: {
       options.onBudget?.(usage);
       options.onStatus?.(`正在${toolLabel(name)}…`);
       try {
-        const result = await handler(request);
+        const result = await raceAbort(options.signal, handler(request));
         const madeProgress = toolMadeProgress(name, result);
         usage.noProgressCalls = madeProgress ? 0 : usage.noProgressCalls + 1;
-        if (madeProgress) {
-          usage.cdpDiagnosticsSinceProgress = 0;
-        } else if (name === 'execute_cdp_script') {
-          usage.cdpDiagnosticsSinceProgress += 1;
-        }
         if (usage.noProgressCalls >= 5) {
           options.onStatus?.('连续多次未观察到目标状态推进，正在切换策略…');
           usage.noProgressCalls = 0;

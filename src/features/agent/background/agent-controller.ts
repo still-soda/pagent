@@ -84,6 +84,19 @@ function broadcast(control: AgentControl, event: AgentEvent) {
   }).catch(() => {});
 }
 
+/** 立即终止一个运行中的控制体：中断底层调用，同时把会话结算为「任务已停止」。
+ * broadcastEvent=false 用于即将被新会话顶替的场景，避免终止事件与新会话事件竞争。 */
+function stopControl(control: AgentControl, broadcastEvent: boolean) {
+  running.delete(control.tabId);
+  control.abort.abort();
+  if (!control.conversationId) return;
+  const event: AgentEvent = { type: 'error', message: '任务已停止' };
+  control.store = applyAgentEventToStore(control.store, control.conversationId, event);
+  tabStores.set(control.tabId, control.store);
+  queueTabStoreWrite(control.tabId, control.store, true);
+  if (broadcastEvent) broadcast(control, event);
+}
+
 export async function startAgent(
   tabId: number,
   prompt: string,
@@ -92,7 +105,9 @@ export async function startAgent(
   context?: string,
   imageDataUrl?: string,
 ) {
-  stopAgent(tabId);
+  const previous = findRunningByTab(tabId) ?? running.get(tabId);
+  running.delete(tabId);
+  if (previous) stopControl(previous, false);
   const abort = new AbortController();
   const currentUrl = await resolveTabUrl(tabId);
   const existing =
@@ -185,12 +200,11 @@ export async function startAgent(
 
 export function stopAgent(tabId: number) {
   const control = findRunningByTab(tabId) ?? running.get(tabId);
-  control?.abort.abort();
-  if (control) running.delete(control.tabId);
   running.delete(tabId);
+  if (control) stopControl(control, true);
 }
 
 export function stopAgentForTab(tabId: number): void {
   const control = findRunningByTab(tabId) ?? running.get(tabId);
-  control?.abort.abort();
+  if (control) stopControl(control, true);
 }

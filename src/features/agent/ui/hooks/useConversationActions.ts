@@ -101,13 +101,15 @@ export function useConversationActions(options: {
   ]);
 
   const stop = useCallback(async () => {
-    await rpc('agent.stop', {});
+    // 本地立即结算，不等后台往返；后台会同步结算 store 并广播终止事件
+    runningIdRef.current = null;
     setWorkingOnThisPage(false);
     setAgentActive(false);
     setConversations((current) =>
       current.map((item) => (item.running ? settleFinishedConversation(item) : item)),
     );
-  }, [setAgentActive, setConversations, setWorkingOnThisPage]);
+    await rpc('agent.stop', {});
+  }, [runningIdRef, setAgentActive, setConversations, setWorkingOnThisPage]);
 
   const createConversation = useCallback(() => {
     const domain = conversationVaultKey(pageUrlRef.current);

@@ -61,6 +61,7 @@ export async function runAgent(options: {
   let emitUsage = () => {};
 
   const safety = createSafetyMiddleware({
+    signal: options.signal,
     onBudget: (usage) =>
       options.emit({
         type: 'budget',
