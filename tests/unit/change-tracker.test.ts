@@ -6,6 +6,16 @@ import {
 } from '@/features/page/change-tracker';
 import { pageObserver } from '@/features/page/observer';
 
+function stubBox(el: Element, visible = true) {
+  const rect = visible
+    ? { x: 0, y: 0, top: 0, left: 0, right: 200, bottom: 50, width: 200, height: 50 }
+    : { x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 };
+  Object.defineProperty(el, 'getBoundingClientRect', {
+    value: () => ({ ...rect, toJSON: () => rect }),
+    configurable: true,
+  });
+}
+
 function snapshot(
   nodes: PageChangeSnapshot['nodes'],
   overrides: Partial<PageChangeSnapshot> = {},
@@ -105,5 +115,50 @@ describe('PageChangeTracker', () => {
       before: { url: 'https://example.com/' },
       after: { url: 'https://example.com/next' },
     });
+  });
+
+  it('tracks container elements like div and span', () => {
+    document.body.innerHTML = '<div><span>已保存</span></div>';
+    stubBox(document.querySelector('div')!);
+    stubBox(document.querySelector('span')!);
+    const nodes = new PageChangeTracker().snapshot().nodes;
+    expect(nodes.some((node) => node.tag === 'span' && node.name === '已保存' && node.visible)).toBe(true);
+    expect(nodes.some((node) => node.tag === 'div')).toBe(true);
+  });
+
+  it('detects opacity-driven visibility flips on containers', async () => {
+    document.body.innerHTML = '<div><span id="chip" style="opacity: 0">已保存</span></div>';
+    const chip = document.getElementById('chip')!;
+    stubBox(chip);
+    const tracker = new PageChangeTracker();
+    const release = tracker.install();
+    const baseline = tracker.snapshot();
+    expect(baseline.nodes.some((node) => node.tag === 'span' && !node.visible)).toBe(true);
+
+    chip.style.opacity = '1';
+    const result = await tracker.read(baseline, { timeoutMs: 500, quietMs: 50 });
+    release();
+
+    expect(result.settled).toBe(true);
+    expect(result.changes).toContainEqual(
+      expect.objectContaining({ kind: 'visibility_changed', before: false, after: true }),
+    );
+  });
+
+  it('detects elements revealed via inline style display', async () => {
+    document.body.innerHTML = '<div id="panel" style="display: none">面板内容</div>';
+    const panel = document.getElementById('panel')!;
+    stubBox(panel);
+    const tracker = new PageChangeTracker();
+    const release = tracker.install();
+    const baseline = tracker.snapshot();
+    expect(baseline.nodes.some((node) => node.name === '面板内容')).toBe(false);
+
+    panel.style.display = 'block';
+    const result = await tracker.read(baseline, { timeoutMs: 500, quietMs: 50 });
+    release();
+
+    expect(result.settled).toBe(true);
+    expect(result.changes.some((change) => change.kind === 'added' && change.target?.name === '面板内容')).toBe(true);
   });
 });

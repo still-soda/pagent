@@ -23,6 +23,19 @@ const CHANGE_CANDIDATES = [
   'th',
 ].join(',');
 
+const CONTAINER_CANDIDATES = [
+  'div',
+  'span',
+  'img',
+  'section',
+  'article',
+  'header',
+  'footer',
+  'nav',
+  'main',
+  'aside',
+].join(',');
+
 export type PageChangeNode = {
   id: string;
   tag: string;
@@ -220,10 +233,7 @@ export class PageChangeTracker {
   install(root: Document = document): () => void {
     if (this.observer) return () => this.disconnect();
     this.observer = new MutationObserver((records) => {
-      const relevant = records.filter(
-        (record) => !isIgnored(record.target)
-          && !(record.type === 'attributes' && record.attributeName === 'style'),
-      );
+      const relevant = records.filter((record) => !isIgnored(record.target));
       if (relevant.length) this.signal(relevant.length);
     });
     this.observer.observe(root.documentElement, {
@@ -254,28 +264,32 @@ export class PageChangeTracker {
 
   snapshot(maxNodes = 400, root: Document = document): PageChangeSnapshot {
     const nodes: PageChangeNode[] = [];
-    for (const element of Array.from(root.querySelectorAll(CHANGE_CANDIDATES))) {
-      if (element.closest(SKIP)) continue;
-      const described = pageObserver.describe(element);
-      if (!described) continue;
-      const html = element as HTMLElement;
-      nodes.push({
-        id: described.id,
-        tag: described.tag,
-        role: described.role,
-        name: redactText(truncate(visibleText(element) || described.name, 160)),
-        value: formValue(element),
-        href: described.href ? truncate(sanitizeUrl(described.href), 300) : undefined,
-        visible: described.visible,
-        disabled: described.disabled,
-        checked: described.checked,
-        selected: element instanceof HTMLOptionElement ? element.selected : undefined,
-        expanded:
-          html.getAttribute('aria-expanded') == null
-            ? undefined
-            : html.getAttribute('aria-expanded') === 'true',
-      });
-      if (nodes.length >= maxNodes) break;
+    const seen = new Set<Element>();
+    scan: for (const selector of [CHANGE_CANDIDATES, CONTAINER_CANDIDATES]) {
+      for (const element of Array.from(root.querySelectorAll(selector))) {
+        if (seen.has(element) || element.closest(SKIP)) continue;
+        seen.add(element);
+        const described = pageObserver.describe(element);
+        if (!described) continue;
+        const html = element as HTMLElement;
+        nodes.push({
+          id: described.id,
+          tag: described.tag,
+          role: described.role,
+          name: redactText(truncate(visibleText(element) || described.name, 160)),
+          value: formValue(element),
+          href: described.href ? truncate(sanitizeUrl(described.href), 300) : undefined,
+          visible: described.visible,
+          disabled: described.disabled,
+          checked: described.checked,
+          selected: element instanceof HTMLOptionElement ? element.selected : undefined,
+          expanded:
+            html.getAttribute('aria-expanded') == null
+              ? undefined
+              : html.getAttribute('aria-expanded') === 'true',
+        });
+        if (nodes.length >= maxNodes) break scan;
+      }
     }
     return {
       watchId: nowId('watch'),

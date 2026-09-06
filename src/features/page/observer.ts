@@ -178,14 +178,15 @@ export class PageObserver {
   private serialize(el: Element): ObservedElement | null {
     const rect = el.getBoundingClientRect();
     const view = el.ownerDocument.defaultView;
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden') return null;
     const visible = rect.width > 1
       && rect.height > 1
       && rect.bottom > 0
       && rect.right > 0
       && rect.top < (view?.innerHeight ?? Number.POSITIVE_INFINITY)
-      && rect.left < (view?.innerWidth ?? Number.POSITIVE_INFINITY);
-    const style = window.getComputedStyle(el);
-    if (style.display === 'none' || style.visibility === 'hidden') return null;
+      && rect.left < (view?.innerWidth ?? Number.POSITIVE_INFINITY)
+      && isVisuallyRendered(el, style);
 
     const id = this.ensureId(el);
     const html = el as HTMLElement;
@@ -292,6 +293,17 @@ export class PageObserver {
 
 export function visibleText(el: Element): string {
   return (el.textContent ?? '').replace(/\s+/g, ' ').trim();
+}
+
+function isVisuallyRendered(el: Element, style: CSSStyleDeclaration): boolean {
+  const check = (el as Element & {
+    checkVisibility?: (options?: { checkOpacity?: boolean; checkVisibilityCSS?: boolean }) => boolean;
+  }).checkVisibility;
+  if (typeof check === 'function') {
+    return check.call(el, { checkOpacity: true, checkVisibilityCSS: true });
+  }
+  const opacity = Number.parseFloat(style.opacity ?? '1');
+  return Number.isNaN(opacity) || opacity > 0;
 }
 
 export function implicitRole(el: Element): string {
