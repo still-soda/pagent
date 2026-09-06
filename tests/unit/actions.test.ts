@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   clickElement,
+  findCommonAncestor,
   inspectElementTree,
   interactElements,
   typeText,
@@ -132,5 +133,82 @@ describe('generic element interactions', () => {
     expect(result.emittedLabels).toBe(3);
     expect(result.tree.split('\n')).toHaveLength(3);
     expect(result.tree).toContain('more-label remaining-labels=2');
+  });
+});
+
+describe('findCommonAncestor', () => {
+  it('finds the nearest common ancestor of two elements', () => {
+    document.body.innerHTML = `
+      <section id="card" aria-label="用户卡片">
+        <div class="row"><button id="a">A</button></div>
+        <div class="row"><span><button id="b">B</button></span></div>
+      </section>
+    `;
+    const card = document.querySelector('#card')!;
+    const idA = pageObserver.register(document.querySelector('#a')!);
+    const idB = pageObserver.register(document.querySelector('#b')!);
+
+    const result = findCommonAncestor([idA, idB]);
+
+    expect(result.elementId).toBe(pageObserver.register(card));
+    expect(result.tag).toBe('section');
+    expect(result.name).toBe('用户卡片');
+    expect(result.sameElement).toBe(false);
+    expect(result.depths).toEqual([2, 3]);
+  });
+
+  it('finds the nearest common ancestor of three or more elements', () => {
+    document.body.innerHTML = `
+      <form id="form">
+        <fieldset id="group">
+          <input id="x" />
+          <input id="y" />
+        </fieldset>
+        <button id="submit">提交</button>
+      </form>
+    `;
+    const idX = pageObserver.register(document.querySelector('#x')!);
+    const idY = pageObserver.register(document.querySelector('#y')!);
+    const idSubmit = pageObserver.register(document.querySelector('#submit')!);
+
+    const partial = findCommonAncestor([idX, idY]);
+    expect(partial.elementId).toBe(pageObserver.register(document.querySelector('#group')!));
+    expect(partial.depths).toEqual([1, 1]);
+
+    const all = findCommonAncestor([idX, idY, idSubmit]);
+    expect(all.elementId).toBe(pageObserver.register(document.querySelector('#form')!));
+    expect(all.depths).toEqual([2, 2, 1]);
+  });
+
+  it('returns the element itself when all ids point to the same element', () => {
+    document.body.innerHTML = '<div><button id="solo">S</button></div>';
+    const id = pageObserver.register(document.querySelector('#solo')!);
+
+    const result = findCommonAncestor([id, id, id]);
+
+    expect(result.sameElement).toBe(true);
+    expect(result.depths).toEqual([0, 0, 0]);
+    expect(result.elementId).toBe(id);
+  });
+
+  it('crosses shadow roots when computing ancestors', () => {
+    document.body.innerHTML = '<div id="host"></div><button id="outside">O</button>';
+    const host = document.querySelector('#host')!;
+    const shadow = host.attachShadow({ mode: 'open' });
+    shadow.innerHTML = '<button id="inner">I</button>';
+    const idInner = pageObserver.register(shadow.querySelector('#inner')!);
+    const idOutside = pageObserver.register(document.querySelector('#outside')!);
+
+    const result = findCommonAncestor([idInner, idOutside]);
+
+    expect(result.elementId).toBe(pageObserver.register(document.body));
+    expect(result.tag).toBe('body');
+  });
+
+  it('rejects fewer than two elements', () => {
+    document.body.innerHTML = '<button id="only">O</button>';
+    const id = pageObserver.register(document.querySelector('#only')!);
+
+    expect(() => findCommonAncestor([id])).toThrow('至少需要两个元素');
   });
 });

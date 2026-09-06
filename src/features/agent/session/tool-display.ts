@@ -57,6 +57,7 @@ const TOOLS: Record<string, ToolMeta> = {
   close_tab: { label: '关闭标签页', kind: 'tab' },
   extract_interactions: { label: '提取交互目标', kind: 'observe' },
   inspect_element_tree: { label: '查看元素结构', kind: 'read' },
+  find_common_ancestor: { label: '查找共同祖先', kind: 'read' },
   execute_named_script: { label: '运行内置脚本', kind: 'read' },
   execute_cdp_script: { label: '执行页面脚本', kind: 'script' },
   cdp_click_xy: { label: '坐标点击', kind: 'click' },
@@ -185,6 +186,10 @@ export function toolChip(name: string, args?: unknown, status?: string): string 
       return text(fields.elementId)
         ? `根元素 ${truncate(text(fields.elementId), 18)}`
         : '轻量元素树';
+    case 'find_common_ancestor':
+      return Array.isArray(fields.elementIds) && fields.elementIds.length > 0
+        ? `${fields.elementIds.length} 个元素的祖先`
+        : '最近共同祖先';
     case 'execute_named_script':
       return NAMED_SCRIPTS[text(fields.name)] ?? text(fields.name) ?? '只读脚本';
     case 'execute_cdp_script':

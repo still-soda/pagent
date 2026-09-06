@@ -84,6 +84,7 @@ export const BUILTIN_TOOL_NAMES: ReadonlySet<string> = new Set([
   'close_tab',
   'extract_interactions',
   'inspect_element_tree',
+  'find_common_ancestor',
   'execute_named_script',
   'execute_cdp_script',
   'cdp_click_xy',
@@ -541,6 +542,20 @@ export async function createAgentTools(bridge: ToolBridge) {
     },
   );
 
+  const commonAncestor = tool(
+    async ({ elementIds, revision }) =>
+      safeJson(await bridge.content('dom.commonAncestor', { elementIds, revision })),
+    {
+      name: 'find_common_ancestor',
+      description:
+        '传入多个 elementId，快速返回它们在 DOM 树（含 Shadow DOM）中的最近共同祖先元素。返回的 elementId 已注册，可直接配合 inspect_element_tree 查看该共同容器的局部结构，适合定位多个控件共同的表单、卡片或弹窗容器。',
+      schema: z.object({
+        elementIds: z.array(z.string()).min(2).max(20).describe('两个或更多元素 ID'),
+        revision: z.number().int().nonnegative().optional(),
+      }),
+    },
+  );
+
   const cdpScript = tool(
     async ({ expression, awaitPromise }) => {
       if (!bridge.settings.allowCdpScript) {
@@ -699,6 +714,7 @@ export async function createAgentTools(bridge: ToolBridge) {
     closeTab,
     extractInteractions,
     inspectElementTree,
+    commonAncestor,
     namedScript,
     cdpScript,
     cdpClick,

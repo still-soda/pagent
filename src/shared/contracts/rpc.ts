@@ -104,6 +104,11 @@ export const elementTreePayloadSchema = elementRefSchema.extend({
   maxLength: z.number().int().min(2).max(2_000).optional(),
 });
 
+export const commonAncestorPayloadSchema = z.object({
+  elementIds: z.array(z.string()).min(2).max(20),
+  revision: z.number().int().nonnegative().optional(),
+});
+
 export const sourcePayloadSchema = z.object({
   type: z.enum(SOURCE_TYPES).optional(),
   grep: z.string().min(1).max(300).optional(),
@@ -197,6 +202,7 @@ export const rpcSchemas = {
   'dom.wait': waitPayloadSchema,
   'dom.script': namedScriptPayloadSchema,
   'dom.elementTree': elementTreePayloadSchema,
+  'dom.commonAncestor': commonAncestorPayloadSchema,
   'page.info': z.object({}),
   'page.source': sourcePayloadSchema,
   'page.navigate': navigatePayloadSchema,

@@ -3,6 +3,7 @@ import {
   clearElement,
   clickElement,
   dblclickElement,
+  findCommonAncestor,
   focusElement,
   highlight,
   hoverElement,
@@ -128,6 +129,11 @@ export function handleContentCommand(name: string, payload: Record<string, unkno
         maxDepth: payload.maxDepth as number | undefined,
         maxLength: payload.maxLength as number | undefined,
       });
+    case 'dom.commonAncestor':
+      return findCommonAncestor(
+        (payload.elementIds as string[]).map(String),
+        payload.revision as number | undefined,
+      );
     case 'page.info':
       return {
         url: location.href,
