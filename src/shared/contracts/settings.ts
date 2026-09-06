@@ -276,7 +276,6 @@ export type AgentSettings = {
   model: ModelSettings;
   memory: MemorySettings;
   executionMode: ExecutionMode;
-  allowCdpScript: boolean;
   allowCrossOrigin: boolean;
   captureScreenshots: boolean;
   /** 截图以真实图片（image_url 内容块）传给模型，而不是 base64 文本；需要模型支持视觉 */
@@ -311,7 +310,6 @@ export const DEFAULT_SETTINGS: AgentSettings = {
     rerankerModel: 'jina-reranker-v3.5',
   },
   executionMode: 'dom',
-  allowCdpScript: false,
   allowCrossOrigin: false,
   captureScreenshots: true,
   screenshotAsImage: true,

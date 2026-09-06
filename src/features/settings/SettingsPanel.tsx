@@ -473,11 +473,6 @@ export function SettingsPanel({
           </Button>
         ) : null}
         <SettingRow
-          label="允许 CDP 执行模型表达式"
-          checked={settings.allowCdpScript}
-          onCheckedChange={(allowCdpScript) => void patch({ allowCdpScript })}
-        />
-        <SettingRow
           label="发送截图给模型"
           checked={settings.captureScreenshots}
           onCheckedChange={(captureScreenshots) => void patch({ captureScreenshots })}

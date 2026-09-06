@@ -11,6 +11,7 @@ import {
   getNetworkLog,
   getNetworkRequest,
   insertText,
+  sendCdp,
 } from '@/shared/browser/cdp';
 import {
   closeTab,
@@ -179,6 +180,8 @@ export function createBridge(
     cdp: {
       script: (expression: string, awaitPromise?: boolean) =>
         evaluateExpression(tabId(), expression, awaitPromise),
+      command: (method: string, params?: Record<string, unknown>) =>
+        sendCdp(tabId(), method, params),
       input: async (payload: { x: number; y: number; type?: string; text?: string }) => {
         await attachDebugger(tabId());
         if (payload.type === 'move') await dispatchMove(tabId(), payload.x, payload.y);

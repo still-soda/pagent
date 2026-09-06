@@ -12,7 +12,6 @@ export type UsageState = {
   tokens: TurnUsage;
   history: Array<{ name: string; args: string }>;
   noProgressCalls: number;
-  cdpDiagnosticsSinceProgress: number;
 };
 
 export function isUnrecoverableToolError(error: unknown): boolean {
@@ -70,7 +69,6 @@ export function createSafetyMiddleware(options: {
     tokens: emptyTurnUsage(),
     history: [],
     noProgressCalls: 0,
-    cdpDiagnosticsSinceProgress: 0,
   };
 
   const middleware = createMiddleware({
@@ -90,18 +88,6 @@ export function createSafetyMiddleware(options: {
       const name = request.toolCall?.name ?? 'unknown';
       const args = JSON.stringify(request.toolCall?.args ?? {});
       const elapsedMs = () => Date.now() - usage.startedAt;
-      if (name === 'execute_cdp_script' && usage.cdpDiagnosticsSinceProgress >= 1) {
-        return withElapsedPrefix(
-          new ToolMessage({
-            content:
-              '本轮在页面状态未推进时已经执行过一次 CDP 诊断。禁止继续改写脚本摸索；请依据已有结果执行操作、改用 scope=page 的结构化工具，或向用户说明阻塞。',
-            tool_call_id: request.toolCall.id ?? '',
-            name,
-            status: 'error',
-          }),
-          elapsedMs(),
-        );
-      }
       if (isRepeatedAction(usage.history, name, request.toolCall?.args, 3)) {
         throw new Error(`检测到重复动作 ${name}，已停止以防死循环`);
       }

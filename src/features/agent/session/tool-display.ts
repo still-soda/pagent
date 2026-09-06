@@ -60,6 +60,7 @@ const TOOLS: Record<string, ToolMeta> = {
   find_common_ancestor: { label: '查找共同祖先', kind: 'read' },
   execute_named_script: { label: '运行内置脚本', kind: 'read' },
   execute_cdp_script: { label: '执行页面脚本', kind: 'script' },
+  execute_cdp_command: { label: '发送 CDP 命令', kind: 'script' },
   cdp_click_xy: { label: '坐标点击', kind: 'click' },
   get_network_log: { label: '查看网络请求', kind: 'network' },
   get_console_log: { label: '查看控制台', kind: 'network' },
@@ -194,6 +195,8 @@ export function toolChip(name: string, args?: unknown, status?: string): string 
       return NAMED_SCRIPTS[text(fields.name)] ?? text(fields.name) ?? '只读脚本';
     case 'execute_cdp_script':
       return text(fields.expression) ? truncate(text(fields.expression), 28) : '页面表达式';
+    case 'execute_cdp_command':
+      return text(fields.method) ? `命令 ${truncate(text(fields.method), 36)}` : 'CDP 命令';
     case 'cdp_click_xy':
       return typeof fields.x === 'number' && typeof fields.y === 'number'
         ? `坐标 ${Math.round(fields.x)}, ${Math.round(fields.y)}`

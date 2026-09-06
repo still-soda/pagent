@@ -27,6 +27,7 @@ export type ToolBridge = {
   };
   cdp: {
     script: (expression: string, awaitPromise?: boolean) => Promise<unknown>;
+    command: (method: string, params?: Record<string, unknown>) => Promise<unknown>;
     input: (payload: { x: number; y: number; type?: string; text?: string }) => Promise<unknown>;
     screenshot: (fullPage?: boolean, raw?: boolean) => Promise<string>;
     network: (filter?: {
@@ -87,6 +88,7 @@ export const BUILTIN_TOOL_NAMES: ReadonlySet<string> = new Set([
   'find_common_ancestor',
   'execute_named_script',
   'execute_cdp_script',
+  'execute_cdp_command',
   'cdp_click_xy',
   'get_network_log',
   'get_console_log',
@@ -221,7 +223,7 @@ export async function createAgentTools(bridge: ToolBridge) {
       safeJson(await trackAction(() => bridge.content('dom.click', { elementId, revision }))),
     {
       name: 'click_element',
-      description: '点击 observe_page 返回的 elementId。',
+      description: '点击 observe_page 返回的 elementId。点击前会先派发完整的 hover 事件序列（pointerover/mouseover/mouseenter/mousemove），可触发依赖悬停展开的菜单或控件。',
       schema: z.object({
         elementId: z.string(),
         revision: z.number().optional(),
@@ -557,22 +559,35 @@ export async function createAgentTools(bridge: ToolBridge) {
   );
 
   const cdpScript = tool(
-    async ({ expression, awaitPromise }) => {
-      if (!bridge.settings.allowCdpScript) {
-        return '用户未启用 CDP 任意表达式执行。请改用 observe_page 或 execute_named_script。';
-      }
-      return truncate(
+    async ({ expression, awaitPromise }) =>
+      truncate(
         safeJson(await trackAction(() => bridge.cdp.script(expression, awaitPromise))),
         6000,
-      );
-    },
+      ),
     {
       name: 'execute_cdp_script',
       description:
-        '仅在用户启用且 observe_page、extract_interactions 等结构化工具明确失败后，通过 CDP Runtime.evaluate 执行一次有界诊断或操作。不要用多个脚本逐项摸索页面结构。',
+        '通过 CDP Runtime.evaluate 在当前标签页执行 JavaScript 表达式，可 awaitPromise。结构化工具（observe_page、extract_interactions 等）满足需求时优先用结构化工具。',
       schema: z.object({
         expression: z.string(),
         awaitPromise: z.boolean().optional(),
+      }),
+    },
+  );
+
+  const cdpCommand = tool(
+    async ({ method, params }) =>
+      truncate(
+        safeJson(await trackAction(() => bridge.cdp.command(method, params))),
+        8000,
+      ),
+    {
+      name: 'execute_cdp_command',
+      description:
+        '直接向当前标签页发送任意 Chrome DevTools Protocol 命令（method + params，如 DOM.getDocument、Emulation.setDeviceMetricsOverride、Input.dispatchMouseEvent 等），返回 CDP 结果。需要 debugger 权限；结构化工具满足需求时优先用结构化工具。',
+      schema: z.object({
+        method: z.string().regex(/^[A-Za-z]+\.[A-Za-z]+$/).describe('CDP 域和方法名，例如 Page.captureScreenshot'),
+        params: z.record(z.string(), z.unknown()).optional().describe('该方法对应的 CDP 参数对象'),
       }),
     },
   );
@@ -717,6 +732,7 @@ export async function createAgentTools(bridge: ToolBridge) {
     commonAncestor,
     namedScript,
     cdpScript,
+    cdpCommand,
     cdpClick,
     networkLog,
     consoleLog,
