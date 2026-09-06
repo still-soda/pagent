@@ -42,6 +42,9 @@ const sessions = new Map<number, Session>();
 const stores = new Map<number, DevtoolsStore>();
 let debuggerHooked = false;
 
+const JUST_ENABLED_NOTICE =
+  '此前未开启调试，现已开启调试并开始采集。本次调用之前的事件不可见；请复现操作或刷新页面后再查询。';
+
 type DebuggerHost = {
   chrome?: Record<string, unknown>;
   browser?: Record<string, unknown>;
@@ -119,10 +122,11 @@ export async function detachDebugger(tabId: number): Promise<void> {
   stores.delete(tabId);
 }
 
-export async function startDevtoolsCapture(tabId: number): Promise<DevtoolsStore> {
+export async function startDevtoolsCapture(tabId: number): Promise<{ store: DevtoolsStore; justEnabled: boolean }> {
+  const alreadyCapturing = Boolean(stores.get(tabId)?.capturing && sessions.get(tabId)?.attached);
   await attachDebugger(tabId);
   const existing = stores.get(tabId);
-  if (existing?.capturing) return existing;
+  if (existing?.capturing) return { store: existing, justEnabled: !alreadyCapturing };
   const store = existing ?? createDevtoolsStore();
   stores.set(tabId, store);
   const api = await requireDebugger();
@@ -135,35 +139,39 @@ export async function startDevtoolsCapture(tabId: number): Promise<DevtoolsStore
   }
   store.capturing = true;
   store.startedAt = Date.now();
-  return store;
+  return { store, justEnabled: true };
 }
 
 function requireStore(tabId: number): DevtoolsStore {
   return stores.get(tabId) ?? createDevtoolsStore();
 }
 
+function withCaptureMeta<T extends Record<string, unknown>>(payload: T, justEnabled: boolean) {
+  return justEnabled ? { justEnabled, notice: JUST_ENABLED_NOTICE, ...payload } : { justEnabled, ...payload };
+}
+
 export async function getNetworkLog(tabId: number, filter: NetworkFilter = {}) {
-  const store = await startDevtoolsCapture(tabId);
+  const { store, justEnabled } = await startDevtoolsCapture(tabId);
   const entries = listNetwork(store, filter).map(summarizeNetwork);
-  return {
+  return withCaptureMeta({
     capturing: store.capturing,
     startedAt: store.startedAt,
     total: store.networkOrder.length,
     count: entries.length,
     entries,
-  };
+  }, justEnabled);
 }
 
 export async function getConsoleLog(tabId: number, filter: ConsoleFilter = {}) {
-  const store = await startDevtoolsCapture(tabId);
+  const { store, justEnabled } = await startDevtoolsCapture(tabId);
   const entries = listConsole(store, filter);
-  return {
+  return withCaptureMeta({
     capturing: store.capturing,
     startedAt: store.startedAt,
     total: store.console.length,
     count: entries.length,
     entries,
-  };
+  }, justEnabled);
 }
 
 export async function getNetworkRequest(
@@ -171,16 +179,16 @@ export async function getNetworkRequest(
   requestId: string,
   includeBody = false,
 ) {
-  await startDevtoolsCapture(tabId);
+  const { justEnabled } = await startDevtoolsCapture(tabId);
   const entry = getNetworkEntry(requireStore(tabId), requestId);
   if (!entry) {
-    return { error: '未找到该请求。requestId 来自 get_network_log。' };
+    return withCaptureMeta({ error: '未找到该请求。requestId 来自 get_network_log。' }, justEnabled);
   }
 
-  if (!includeBody) return entry;
+  if (!includeBody) return withCaptureMeta({ ...entry }, justEnabled);
 
   if (!isTextualMime(entry.mimeType)) {
-    return { ...entry, bodyNote: '非文本响应，已省略正文' };
+    return withCaptureMeta({ ...entry, bodyNote: '非文本响应，已省略正文' }, justEnabled);
   }
 
   try {
@@ -194,12 +202,12 @@ export async function getNetworkRequest(
       try {
         text = atob(text);
       } catch {
-        return { ...entry, bodyNote: '无法解码 base64 正文' };
+        return withCaptureMeta({ ...entry, bodyNote: '无法解码 base64 正文' }, justEnabled);
       }
     }
-    return { ...entry, body: truncate(redactText(text), 6000) };
+    return withCaptureMeta({ ...entry, body: truncate(redactText(text), 6000) }, justEnabled);
   } catch {
-    return { ...entry, bodyNote: '无法读取响应体（可能已丢弃、跨源或过大）' };
+    return withCaptureMeta({ ...entry, bodyNote: '无法读取响应体（可能已丢弃、跨源或过大）' }, justEnabled);
   }
 }
 

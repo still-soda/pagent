@@ -1,6 +1,5 @@
 import { CHANNEL } from '@/shared/contracts/channel';
 import { runAgent } from '@/features/agent/runtime/runtime';
-import { startDevtoolsCapture } from '@/shared/browser/cdp';
 import {
   createPageStore,
   emptyConversation,
@@ -162,9 +161,6 @@ export async function startAgent(
   await writeTabStore(tabId, store);
   beginBusyKeepAlive();
   const settings = await loadSettings();
-  if (settings.captureDevtools) {
-    void startDevtoolsCapture(tabId).catch(() => {});
-  }
   const isCurrent = () => findRunningByTab(control.tabId)?.abort === abort;
   const done = runAgent({
     prompt,
