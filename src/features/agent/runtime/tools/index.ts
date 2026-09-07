@@ -32,7 +32,6 @@ export const BUILTIN_TOOL_NAMES: ReadonlySet<string> = new Set([
   'press_key',
   'scroll_page',
   'wait_for',
-  'highlight_element',
   'navigate',
   'go_back',
   'go_forward',

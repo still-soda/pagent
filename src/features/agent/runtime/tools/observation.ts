@@ -82,7 +82,7 @@ export function createObservationTools(
     {
       name: 'search_page_text',
       description:
-        '在当前页面全文搜索文本（类似查找）。返回 snippet、elementId、可见性和坐标。适合 locate observe_page 没列全的正文、按钮或输入值。找到后可用 click_element / scroll_page / highlight_element。',
+        '在当前页面全文搜索文本（类似查找）。返回 snippet、elementId、可见性和坐标。适合 locate observe_page 没列全的正文、按钮或输入值。找到后可用 click_element / scroll_page。',
       schema: z.object({
         query: z.string().min(1).max(200),
         caseSensitive: z.boolean().optional(),

@@ -67,14 +67,6 @@ export function handleContentCommand(name: string, payload: Record<string, unkno
       return hoverElement(String(payload.elementId), payload.revision as number | undefined);
     case 'dom.focus':
       return focusElement(String(payload.elementId), payload.revision as number | undefined);
-    case 'dom.highlight': {
-      const el = pageObserver.getElement(
-        String(payload.elementId),
-        payload.revision as number | undefined,
-      );
-      highlight(el);
-      return { ok: true };
-    }
     case 'dom.type':
       return typeText(String(payload.elementId), String(payload.text ?? ''), {
         mode: payload.mode as 'replace' | 'append' | undefined,

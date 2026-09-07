@@ -118,7 +118,6 @@ export async function handleRpc(name: RpcName, payload: unknown, senderTabId?: n
     case 'dom.dblclick':
     case 'dom.hover':
     case 'dom.focus':
-    case 'dom.highlight':
     case 'dom.type':
     case 'dom.clear':
     case 'dom.select':

@@ -44,7 +44,6 @@ const TOOLS: Record<string, ToolMeta> = {
   press_key: { label: '按下按键', kind: 'type' },
   scroll_page: { label: '滚动页面', kind: 'navigate' },
   wait_for: { label: '等待变化', kind: 'wait' },
-  highlight_element: { label: '高亮元素', kind: 'observe' },
   navigate: { label: '打开网页', kind: 'navigate' },
   go_back: { label: '后退', kind: 'navigate' },
   go_forward: { label: '前进', kind: 'navigate' },
@@ -127,7 +126,6 @@ export function toolChip(name: string, args?: unknown, status?: string): string 
     case 'click_element':
     case 'dblclick_element':
     case 'hover_element':
-    case 'highlight_element':
     case 'clear_field':
       return text(fields.elementId) ? `目标 ${truncate(text(fields.elementId), 18)}` : fallback;
     case 'type_text':

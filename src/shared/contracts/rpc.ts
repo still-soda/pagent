@@ -233,7 +233,6 @@ export const rpcSchemas = {
   'dom.dblclick': elementRefSchema,
   'dom.hover': elementRefSchema,
   'dom.focus': elementRefSchema,
-  'dom.highlight': elementRefSchema,
   'dom.type': typePayloadSchema,
   'dom.clear': elementRefSchema,
   'dom.select': elementRefSchema.extend({ value: z.string() }),

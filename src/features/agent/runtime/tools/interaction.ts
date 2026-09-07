@@ -164,19 +164,6 @@ export function createInteractionTools(bridge: ToolBridge, trackAction: TrackAct
     },
   );
 
-  const highlight = tool(
-    async ({ elementId, revision }) =>
-      safeJson(await bridge.content('dom.highlight', { elementId, revision })),
-    {
-      name: 'highlight_element',
-      description: '高亮元素以便确认目标。',
-      schema: z.object({
-        elementId: z.string(),
-        revision: z.number().optional(),
-      }),
-    },
-  );
-
   return [
     click,
     dblclick,
@@ -189,6 +176,5 @@ export function createInteractionTools(bridge: ToolBridge, trackAction: TrackAct
     press,
     scroll,
     wait,
-    highlight,
   ];
 }
