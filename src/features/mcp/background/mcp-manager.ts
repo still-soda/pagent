@@ -8,7 +8,6 @@ import { originOf } from '@/shared/utils/utils';
 import { serializeMcpResult } from '@/features/mcp/serialize';
 import { BUILTIN_TOOL_NAMES } from '@/features/agent/runtime/tools/index';
 import type {
-  McpConfig,
   McpServerConfig,
   McpServerStatus,
   McpState,

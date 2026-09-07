@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { rpc } from '@/shared/extension/rpc-client';
 import {
   conversationTabKey,
@@ -15,7 +15,6 @@ import {
   sessionIsOnTab,
   shouldRestoreLiveSession,
 } from '@/features/agent/session/session-live';
-import { conversationVaultKey } from '@/features/agent/session/vault';
 import type { PageConversation, SessionContext } from '@/shared/contracts/session';
 
 export type SessionSyncState = {

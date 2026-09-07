@@ -3,12 +3,8 @@ import type {
   AssistantToolPart,
   ChatMessage,
   ChatToolCall,
-  CommandReference,
-  ElementReference,
-  PageReference,
   TaskStatus,
   TurnUsage,
-  UserBadge,
   UserReference,
 } from '@/shared/contracts/session-messages';
 import { toolLabel } from './tool-display';

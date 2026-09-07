@@ -36,7 +36,6 @@ export function useConversationActions(options: {
     activeIdRef,
     conversationsRef,
     pageUrlRef,
-    revisionRef,
     sessionIdRef,
     deletedConversationIdsRef,
     closedTabIdsRef,

@@ -5,7 +5,6 @@ import {
   dblclickElement,
   findCommonAncestor,
   focusElement,
-  highlight,
   hoverElement,
   inspectElementTree,
   interactElements,

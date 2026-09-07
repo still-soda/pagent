@@ -3,7 +3,6 @@ import { runAgent } from '@/features/agent/runtime/runtime';
 import {
   createPageStore,
   emptyConversation,
-  isSparseStore,
   titleFromPrompt,
 } from '@/features/agent/session/conversations';
 import { adoptLiveStore, applyAgentEventToStore, nextStoreRevision } from '@/features/agent/session/session-live';
