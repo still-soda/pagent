@@ -286,6 +286,8 @@ export async function handleRpc(name: RpcName, payload: unknown, senderTabId?: n
         data.history,
         data.context,
         data.imageDataUrl,
+        data.badges,
+        data.references,
       );
     }
     case 'session.context': {

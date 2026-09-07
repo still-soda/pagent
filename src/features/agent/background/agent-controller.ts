@@ -10,7 +10,7 @@ import { adoptLiveStore, applyAgentEventToStore, nextStoreRevision } from '@/fea
 import { conversationVaultKey } from '@/features/agent/session/vault';
 import { loadSettings } from '@/shared/storage/storage';
 import type { AgentEvent } from '@/shared/contracts/agent';
-import type { ChatMessage, PageConversationStore } from '@/shared/contracts/session';
+import type { ChatMessage, PageConversationStore, UserBadge, UserReference } from '@/shared/contracts/session';
 import { nowId } from '@/shared/utils/utils';
 import { beginBusyKeepAlive, endBusyKeepAlive } from '@/shared/extension/keepalive';
 import { createBridge, ensureContentScript } from './content-bridge';
@@ -102,6 +102,8 @@ export async function startAgent(
   history?: ChatMessage[],
   context?: string,
   imageDataUrl?: string,
+  badges?: UserBadge[],
+  references?: UserReference[],
 ) {
   const previous = findRunningByTab(tabId) ?? running.get(tabId);
   running.delete(tabId);
@@ -138,7 +140,14 @@ export async function startAgent(
             ? item.messages
             : [
                 ...item.messages,
-                { id: nowId('m'), role: 'user' as const, content: prompt, imageDataUrl },
+                {
+                  id: nowId('m'),
+                  role: 'user' as const,
+                  content: prompt,
+                  imageDataUrl,
+                  badges,
+                  references,
+                },
               ],
           running: true,
           thinking: '正在调用模型…',
@@ -172,6 +181,8 @@ export async function startAgent(
     conversationId: targetId,
     history,
     imageDataUrl,
+    badges,
+    references,
     bridge: createBridge(control, settings, retargetAgent),
     emit: (event) => {
       if (!isCurrent()) return;
