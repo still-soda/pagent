@@ -56,7 +56,7 @@ export function TabStrip({
               onAuxClick={(event) => {
                 if (event.button === 1) closeTab(event, item.id);
               }}
-              className={`group flex h-7 max-w-44 shrink-0 cursor-pointer items-center gap-1.5 rounded-[7px] border px-2 text-[12.5px] transition-colors duration-100 ${
+              className={`group flex h-7 max-w-44 shrink-0 cursor-pointer items-center gap-1.5 rounded-[7px] border pl-2 pr-1 text-[12.5px] transition-colors duration-100 ${
                 active
                   ? 'border-line-strong bg-surface text-ink shadow-hairline'
                   : 'border-transparent text-ink-2 hover:bg-hover hover:text-ink'
