@@ -40,14 +40,26 @@ export function resolveModelBaseURL(settings: AgentSettings): string | undefined
   return baseURL?.trim() || preset.baseURL;
 }
 
+const DEFAULT_MAX_RETRIES = 3;
+
 export function createChatModel(settings: AgentSettings, secrets: SecretMap) {
   const { provider, model } = settings.model;
 
   if (provider === 'anthropic') {
-    return new ChatAnthropic({ apiKey: resolveApiKey(provider, secrets), model, temperature: 0 });
+    return new ChatAnthropic({
+      apiKey: resolveApiKey(provider, secrets),
+      model,
+      temperature: 0,
+      maxRetries: DEFAULT_MAX_RETRIES,
+    });
   }
   if (provider === 'google') {
-    return new ChatGoogleGenerativeAI({ apiKey: resolveApiKey(provider, secrets), model, temperature: 0 });
+    return new ChatGoogleGenerativeAI({
+      apiKey: resolveApiKey(provider, secrets),
+      model,
+      temperature: 0,
+      maxRetries: DEFAULT_MAX_RETRIES,
+    });
   }
 
   const baseURL = resolveModelBaseURL(settings);
@@ -59,6 +71,7 @@ export function createChatModel(settings: AgentSettings, secrets: SecretMap) {
     model,
     temperature: 0,
     streaming: true,
+    maxRetries: DEFAULT_MAX_RETRIES,
     useResponsesApi: protocol === 'responses',
     ...(provider === 'deepseek'
       ? protocol === 'responses'
