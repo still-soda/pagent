@@ -29,7 +29,6 @@ export type ToolBridge = {
     script: (expression: string, awaitPromise?: boolean) => Promise<unknown>;
     command: (method: string, params?: Record<string, unknown>) => Promise<unknown>;
     input: (payload: { x: number; y: number; type?: string; text?: string }) => Promise<unknown>;
-    screenshot: (fullPage?: boolean, raw?: boolean) => Promise<string>;
     network: (filter?: {
       urlIncludes?: string;
       method?: string;
@@ -201,10 +200,7 @@ export async function createAgentTools(bridge: ToolBridge) {
       if (!bridge.settings.captureScreenshots) return '用户已关闭截图。';
       // 以图片形式传给模型时取完整（未截断）data URL；否则沿用旧的截断文本返回
       const raw = bridge.settings.screenshotAsImage;
-      const dataUrl =
-        bridge.settings.executionMode === 'cdp'
-          ? await bridge.cdp.screenshot(fullPage, raw)
-          : await bridge.screenshot(fullPage, raw);
+      const dataUrl = await bridge.screenshot(fullPage, raw);
       if (!bridge.settings.screenshotAsImage) return dataUrl;
       return [
         { type: 'text', text: '截图完成（图片已随本结果提供，可直接查看）。' },

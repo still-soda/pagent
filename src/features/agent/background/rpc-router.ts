@@ -194,10 +194,6 @@ export async function handleRpc(name: RpcName, payload: unknown, senderTabId?: n
       if (data.text) await insertText(tabId, data.text);
       return { ok: true };
     }
-    case 'cdp.screenshot': {
-      const data = parseRpcPayload('cdp.screenshot', payload);
-      return trimDataUrl(await captureCdpScreenshot(tabId, Boolean(data.fullPage)));
-    }
     case 'cdp.network':
       if (!settings.captureDevtools) return { error: '用户已关闭网络/控制台采集。' };
       return getNetworkLog(tabId, parseRpcPayload('cdp.network', payload));

@@ -275,7 +275,6 @@ export const rpcSchemas = {
   'cdp.detach': z.object({}),
   'cdp.script': cdpScriptPayloadSchema,
   'cdp.input': cdpInputPayloadSchema,
-  'cdp.screenshot': z.object({ fullPage: z.boolean().optional() }),
   'cdp.network': networkLogPayloadSchema,
   'cdp.console': consoleLogPayloadSchema,
   'cdp.networkRequest': networkRequestPayloadSchema,

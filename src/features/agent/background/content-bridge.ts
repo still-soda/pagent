@@ -189,11 +189,6 @@ export function createBridge(
         if (payload.text) await insertText(tabId(), payload.text);
         return { ok: true };
       },
-      screenshot: async (fullPage?: boolean, raw?: boolean) =>
-        captureWithHiddenPanel(async (targetTabId) => {
-          const data = await captureCdpScreenshot(targetTabId, Boolean(fullPage));
-          return raw ? data : trimDataUrl(data);
-        }),
       network: (filter?: Parameters<typeof getNetworkLog>[1]) => getNetworkLog(tabId(), filter),
       console: (filter?: Parameters<typeof getConsoleLog>[1]) => getConsoleLog(tabId(), filter),
       request: (requestId: string, includeBody?: boolean) =>
