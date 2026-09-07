@@ -53,7 +53,7 @@ export function Switch({
         >
           <motion.span
             initial={false}
-            animate={{ x: checked ? 14 : 0 }}
+            animate={{ x: checked ? 16 : 0 }}
             className="block size-4 rounded-full bg-knob shadow-sm"
           />
         </motion.button>
