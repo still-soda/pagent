@@ -4,6 +4,7 @@ import { EditPen, Setting, TrendCharts } from '@element-plus/icons-vue'
 import ChartScene from './ChartScene.vue'
 import FormScene from './FormScene.vue'
 import PreferenceScene from './PreferenceScene.vue'
+import { knowledgeBaseScene } from './knowledge-base'
 
 export interface PlaygroundScene {
   id: string
@@ -64,4 +65,5 @@ export const scenes: PlaygroundScene[] = [
     icon: TrendCharts,
     component: ChartScene,
   },
+  knowledgeBaseScene,
 ]
