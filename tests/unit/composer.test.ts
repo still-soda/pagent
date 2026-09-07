@@ -6,7 +6,6 @@ import {
   filterBrowserTabs,
   filterSlashCommands,
   mergeComposerContexts,
-  mentionedTabsContext,
   MENTION_MENU_MAX_HEIGHT,
   normalizeBrowserTabs,
   parseComposerToken,
@@ -100,21 +99,6 @@ describe('browser tabs', () => {
     expect(visiblePrompt('总结这个页面', [tabs[0]!])).toBe('总结这个页面');
     expect(visiblePrompt('   ', [tabs[1]!])).toBe('请查看这些标签页。');
     expect(visiblePrompt('只看当前页', [])).toBe('只看当前页');
-    expect(mentionedTabsContext([tabs[0]!])).toContain('tabId=1 「GitHub」 https://github.com/pagent（当前）');
-    expect(mentionedTabsContext([tabs[0]!])).not.toContain('总结这个页面');
-    const context = mentionedTabsContext([tabs[1]!], [
-      {
-        tabId: 2,
-        title: '文档中心',
-        url: 'https://docs.example.com/guide',
-        content: '安装方式与快速开始',
-        truncated: false,
-      },
-    ]);
-    expect(context).toContain('发送消息时预读取的页面快照');
-    expect(context).toContain('安装方式与快速开始');
-    expect(context).toContain('"tabId":2');
-    expect(mentionedTabsContext([])).toBe('');
   });
 
   it('caps the @ menu so it does not fill the chat panel', () => {

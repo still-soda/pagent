@@ -27,7 +27,6 @@ import {
   visiblePrompt,
   slashCommandContext,
   mergeComposerContexts,
-  mentionedTabsContext,
   filterBrowserTabs,
   filterSlashCommands,
   normalizeBrowserTabs,
