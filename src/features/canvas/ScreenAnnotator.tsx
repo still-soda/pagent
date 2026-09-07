@@ -63,7 +63,7 @@ export function ScreenAnnotator({
   const activeStrokeRef = useRef<Stroke | null>(null);
   const cropStartRef = useRef<Point | null>(null);
   const strokesRef = useRef<Stroke[]>([]);
-  const [tool, setTool] = useState<Tool>('pen');
+  const [tool, setTool] = useState<Tool>('rectangle');
   const [color, setColor] = useState(DEFAULT_COLOR);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [ready, setReady] = useState(false);
@@ -484,10 +484,10 @@ export function ScreenAnnotator({
 
       <div className="absolute inset-x-0 bottom-5 z-30 flex justify-center px-4">
         <div className="flex max-w-[calc(100vw-2rem)] flex-wrap items-center justify-center gap-1 overflow-visible rounded-2xl border border-white/20 bg-surface/95 p-1.5 shadow-raised backdrop-blur">
-          {toolButton('pen', '画笔', <IconPencil className="size-4.5" />)}
+          {toolButton('rectangle', '矩形框选', <IconSquareDashed className="size-4.5" />)}
           {toolButton('eraser', '橡皮擦', <IconEraser className="size-4.5" />)}
           {toolButton('crop', '截取区域', <IconCrop className="size-4.5" />)}
-          {toolButton('rectangle', '矩形框选', <IconSquareDashed className="size-4.5" />)}
+          {toolButton('pen', '画笔', <IconPencil className="size-4.5" />)}
           {toolButton('arrow', '箭头', <IconArrowUpRight className="size-5 stroke-[1.9]" />)}
           {toolButton('text', '文本', <IconTextCaption className="size-4.5" />)}
 
