@@ -8,6 +8,7 @@ export type PageConversation = {
   title: string;
   createdAt: number;
   updatedAt: number;
+  startedAt?: number;
   messages: ChatMessage[];
   tasks: TaskRow[];
   error: string;

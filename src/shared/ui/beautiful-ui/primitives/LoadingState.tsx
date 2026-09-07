@@ -61,28 +61,33 @@ function LoaderGrid({
   );
 }
 
-function useElapsed() {
-  const [ds, setDs] = useState(0);
+function useElapsed(startTime?: number) {
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const t = setInterval(() => setDs((d) => d + 1), 100);
+    const t = setInterval(() => setNow(Date.now()), 100);
     return () => clearInterval(t);
   }, []);
-  const total = ds / 10;
+  const initial = useRef(Date.now());
+  const origin = startTime ?? initial.current;
+  const elapsedMs = Math.max(0, now - origin);
+  const total = elapsedMs / 1000;
   if (total < 60) return `${total.toFixed(1)}s`;
   return `${Math.floor(total / 60)}m ${(total % 60).toFixed(1)}s`;
 }
 
 export default function LoadingState({
   label,
+  startTime,
   variant = "Drive",
   /** the meme feed for the Surfer variant; drop the file in /public to light it up */
   videoSrc = "/subway-surfers.mp4",
 }: {
   label?: string;
+  startTime?: number;
   variant?: string;
   videoSrc?: string;
 }) {
-  const elapsed = useElapsed();
+  const elapsed = useElapsed(startTime);
   const surfer = variant === "Surfer";
   const resolvedLabel = label ?? (surfer ? "Subway surfing" : "Churning");
   const [videoOk, setVideoOk] = useState(true);

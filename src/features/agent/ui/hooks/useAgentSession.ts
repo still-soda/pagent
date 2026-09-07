@@ -154,6 +154,7 @@ export function useAgentSession() {
     running: Boolean(active?.running),
     thinking: active?.thinking ?? '',
     error: active?.error ?? '',
+    startedAt: active?.startedAt,
     page,
     clearSelection,
     send: actions.send,

@@ -160,6 +160,7 @@ export async function startAgent(
               ],
           running: true,
           thinking: '正在调用模型…',
+          startedAt: item.startedAt ?? Date.now(),
           error: '',
         }
       : item,

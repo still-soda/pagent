@@ -49,6 +49,7 @@ export function AgentPanel({
   running,
   workingOnThisPage = running,
   thinking,
+  startedAt,
   error,
   page,
   view,
@@ -86,6 +87,7 @@ export function AgentPanel({
   running: boolean;
   workingOnThisPage?: boolean;
   thinking: string;
+  startedAt?: number;
   error: string;
   page: { url: string; title: string; selection: string };
   conversations: Array<{ id: string; title: string; updatedAt?: number; running?: boolean }>;
@@ -352,7 +354,7 @@ export function AgentPanel({
                 <CommandSavedAlert command={confirmedCommand} />
               )}
               {running && !hidingCurrentTurn && !hasAssistantOutput(renderedMessages.at(-1)) && (
-                <LoadingState label={thinking || '正在思考…'} variant="Dots" />
+                <LoadingState label={thinking || '正在思考…'} variant="Dots" startTime={startedAt} />
               )}
               {error && !hidingCurrentTurn && (
                 <div className="rounded-card bg-red-tint px-3 py-2 text-[12.5px] text-red">
@@ -366,7 +368,7 @@ export function AgentPanel({
         {view === 'chat' && (
           <Composer
             settings={settings}
-            running={running}
+            running={workingOnThisPage}
             onSubmit={(prompt, context, attachedImage, badges, references) => {
               setVisibleFromId((current) => visibleWindowStartId(sourceMessages, current));
               onSubmit(prompt, context, attachedImage, badges, references);

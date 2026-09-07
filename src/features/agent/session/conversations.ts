@@ -296,6 +296,7 @@ export function settleFinishedConversation(item: PageConversation): PageConversa
     ...item,
     running: false,
     thinking: '',
+    startedAt: undefined,
     messages,
     tasks,
   };

@@ -64,11 +64,13 @@ export function useConversationActions(options: {
     const nextRevision = bumpRevision();
     const current = conversationsRef.current.find((item) => item.id === id);
     const history = current?.messages ?? [];
+    const now = Date.now();
     const nextConversations = patchConversation(conversationsRef.current, id, (item) => ({
       ...item,
       error: '',
       running: true,
       thinking: '正在调用模型…',
+      startedAt: item.startedAt ?? now,
       title: titleFromPrompt(item.title, prompt),
       messages: [
         ...item.messages,

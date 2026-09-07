@@ -368,6 +368,7 @@ export function AgentApp({
               running={session.running}
               workingOnThisPage={session.workingOnThisPage}
               thinking={session.thinking}
+              startedAt={session.startedAt}
               error={session.error}
               page={session.page}
               conversations={session.conversations}
