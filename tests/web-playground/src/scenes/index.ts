@@ -1,4 +1,5 @@
 import type { Component } from 'vue'
+import type { RouteRecordRaw } from 'vue-router'
 import { EditPen, Setting, TrendCharts } from '@element-plus/icons-vue'
 import ChartScene from './ChartScene.vue'
 import FormScene from './FormScene.vue'
@@ -11,6 +12,8 @@ export interface PlaygroundScene {
   task: string[]
   icon: Component
   component: Component
+  /** 自定义完整路由（含子路由）；未提供时按 `/{id}` 生成单页路由 */
+  routes?: RouteRecordRaw[]
 }
 
 export const scenes: PlaygroundScene[] = [

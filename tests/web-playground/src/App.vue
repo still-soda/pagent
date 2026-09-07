@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Expand } from '@element-plus/icons-vue'
 import SceneTaskPanel from './components/SceneTaskPanel.vue'
 import { scenes } from './scenes'
 
+const route = useRoute()
+const router = useRouter()
 const menuOpen = ref(false)
-const activeId = ref(scenes[0].id)
 const current = computed(
-  () => scenes.find((scene) => scene.id === activeId.value) ?? scenes[0],
+  () =>
+    scenes.find((scene) => scene.id === route.meta.sceneId) ?? scenes[0],
 )
 
 const closedTasks = ref<Record<string, boolean>>({})
@@ -16,7 +19,7 @@ const taskVisible = computed(
 )
 
 function onSelect(id: string) {
-  activeId.value = id
+  router.push({ name: id })
   menuOpen.value = false
 }
 
@@ -37,7 +40,7 @@ function closeTask() {
       </div>
     </el-header>
     <el-main class="main">
-      <component :is="current.component" />
+      <router-view />
     </el-main>
   </el-container>
 
@@ -54,7 +57,7 @@ function closeTask() {
       <div class="brand-title">星澜工作台</div>
       <div class="brand-sub">v2.4.1</div>
     </div>
-    <el-menu :default-active="activeId" class="scene-menu" @select="onSelect">
+    <el-menu :default-active="current.id" class="scene-menu" @select="onSelect">
       <el-menu-item v-for="scene in scenes" :key="scene.id" :index="scene.id">
         <el-icon>
           <component :is="scene.icon" />
