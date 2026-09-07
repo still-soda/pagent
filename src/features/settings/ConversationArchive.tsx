@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { IconCheck, IconDownload, IconMinus, IconRefresh, IconSearch } from '@tabler/icons-react';
+import { IconBrowser, IconCheck, IconCommand, IconDownload, IconMinus, IconPointer, IconRefresh, IconSearch } from '@tabler/icons-react';
 import { Button } from '@/shared/ui/beui/button';
 import { Input } from '@/shared/ui/beui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/beui/select';
@@ -77,6 +77,47 @@ function PreviewTurn({ turn }: { turn: ExportedConversation['transcript'][number
     <article className="space-y-1.5 rounded-card border border-line bg-page px-3 py-2.5">
       <div className="text-[11px] font-medium tracking-wide text-ink-3">{roleLabel(turn.role)}</div>
       {turn.hasImage && <p className="text-[12px] text-ink-3">{turn.imageDataUrl ? '含截图附件' : '含截图（导出时可附带）'}</p>}
+      {turn.badges && turn.badges.length > 0 && (
+        <div className="flex flex-wrap gap-1 pt-0.5">
+          {turn.badges.map((badge, idx) => {
+            if (badge.type === 'tab') {
+              return (
+                <span
+                  key={`tab-${badge.id}-${idx}`}
+                  className="flex h-5 items-center gap-1 rounded-chip bg-inset px-1.5 text-[10.5px] text-ink-2"
+                >
+                  <IconBrowser size={11} stroke={2} className="shrink-0" />
+                  <span className="max-w-36 truncate">{badge.title}</span>
+                </span>
+              );
+            }
+            if (badge.type === 'command') {
+              return (
+                <span
+                  key={`cmd-${badge.key}-${idx}`}
+                  className="flex h-5 items-center gap-1 rounded-chip bg-primary/12 px-1.5 text-[10.5px] font-medium text-accent-ink"
+                >
+                  <IconCommand size={11} stroke={2} className="shrink-0" />
+                  <span className="max-w-28 truncate">/{badge.key}</span>
+                  {badge.name && <span className="max-w-24 truncate text-ink-3">({badge.name})</span>}
+                </span>
+              );
+            }
+            if (badge.type === 'element') {
+              return (
+                <span
+                  key={`el-${idx}`}
+                  className="flex h-5 items-center gap-1 rounded-chip bg-inset px-1.5 text-[10.5px] text-ink-2"
+                >
+                  <IconPointer size={11} stroke={2} className="shrink-0" />
+                  <span className="max-w-36 truncate">{badge.name || (badge.tag ? `<${badge.tag}>` : '页面元素')}</span>
+                </span>
+              );
+            }
+            return null;
+          })}
+        </div>
+      )}
       {turn.thinking && (
         <p className="whitespace-pre-wrap text-[12px] leading-5 text-ink-3">{turn.thinking}</p>
       )}

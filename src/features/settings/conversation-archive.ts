@@ -8,7 +8,7 @@ import type {
   PageConversationStore,
   VaultMap,
 } from '@/shared/contracts/session';
-import type { ChatMessage, ChatToolCall, TaskRow, TurnUsage } from '@/shared/contracts/session-messages';
+import type { ChatMessage, ChatToolCall, TaskRow, TurnUsage, UserBadge } from '@/shared/contracts/session-messages';
 import { redactText, redactValue } from '@/shared/contracts/policy';
 
 export type ConversationTranscriptTurn = {
@@ -24,6 +24,7 @@ export type ConversationTranscriptTurn = {
     output?: string;
     status: ChatToolCall['status'];
   }>;
+  badges?: UserBadge[];
   usage?: TurnUsage;
   hasImage?: boolean;
   imageDataUrl?: string;
@@ -144,6 +145,7 @@ export function toTranscriptTurn(
     text: redactText(text),
     thinking: thinking ? redactText(thinking) : undefined,
     tools: tools.length ? tools : undefined,
+    badges: message.badges,
     usage: message.usage,
     hasImage: Boolean(message.imageDataUrl),
     imageDataUrl: options.includeImages ? message.imageDataUrl : undefined,
@@ -227,6 +229,17 @@ export function exportedConversationToMarkdown(exported: ExportedConversation): 
     lines.push(`## ${role}`);
     lines.push('');
     if (turn.hasImage) lines.push(turn.imageDataUrl ? `![附件](${turn.imageDataUrl})` : '*含截图附件*');
+    if (turn.badges && turn.badges.length > 0) {
+      const badgeLabels = turn.badges.map((b) => {
+        if (b.type === 'tab') return `[@${b.title}]`;
+        if (b.type === 'command') return `[/${b.key} ${b.name}]`;
+        if (b.type === 'element') return `[元素: ${b.name || (b.tag ? `<${b.tag}>` : '未知')}]`;
+        return '';
+      }).filter(Boolean);
+      if (badgeLabels.length > 0) {
+        lines.push(`*标签: ${badgeLabels.join(' ')}*`);
+      }
+    }
     if (turn.thinking) {
       lines.push('> 思考');
       for (const line of turn.thinking.split('\n')) lines.push(`> ${line}`);
