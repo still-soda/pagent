@@ -1,6 +1,6 @@
 import type { ChatMessage, TaskRow } from './session-messages';
 
-export type { ChatMessage, TaskRow, TaskStatus, ChatRole, ChatToolCall, AssistantPart, TurnUsage } from './session-messages';
+export type { ChatMessage, TaskRow, TaskStatus, ChatRole, ChatToolCall, AssistantPart, TurnUsage, UserBadge, UserReference, PageReference, CommandReference, ElementReference } from './session-messages';
 
 export type PageConversation = {
   id: string;

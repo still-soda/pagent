@@ -22,7 +22,7 @@ import {
 import { emptyTurnUsage, preferRicherUsage, withTurnTiming } from './usage';
 import type { AgentEvent } from '@/shared/contracts/agent';
 import type { AgentSettings } from '@/shared/contracts/settings';
-import type { ChatMessage, TaskRow } from '@/shared/contracts/session-messages';
+import type { ChatMessage, TaskRow, UserBadge, UserReference } from '@/shared/contracts/session-messages';
 
 export type RuntimeHandle = {
   stop: () => void;
@@ -35,6 +35,8 @@ export async function runAgent(options: {
   prompt: string;
   context?: string;
   imageDataUrl?: string;
+  badges?: UserBadge[];
+  references?: UserReference[];
   tabId: number;
   url?: string;
   getTabId?: () => number;
@@ -58,6 +60,8 @@ export async function runAgent(options: {
       role: 'user',
       content: options.prompt,
       imageDataUrl: options.imageDataUrl,
+      badges: options.badges,
+      references: options.references,
     },
   ];
   let emitUsage = () => {};
@@ -90,7 +94,7 @@ export async function runAgent(options: {
   const agent = createAgent({
     model,
     tools,
-    systemPrompt: buildSystemPrompt(options.context, undefined, settings.memory.enabled),
+    systemPrompt: buildSystemPrompt(undefined, settings.memory.enabled),
     middleware: [safety.middleware],
   });
   const tasks: TaskRow[] = [];
@@ -156,7 +160,12 @@ export async function runAgent(options: {
             ...toModelMessages(history, options.prompt),
             {
               role: 'user',
-              content: modelUserContent(options.prompt, options.imageDataUrl),
+              content: modelUserContent(
+                options.prompt,
+                options.imageDataUrl,
+                options.references,
+                options.context,
+              ),
             },
           ],
         },

@@ -67,11 +67,9 @@ function escapeXmlText(value: string): string {
 }
 
 export function buildSystemPrompt(
-  context?: string,
   memoryContext?: string,
   memoryEnabled = true,
 ): string {
-  const extra = context?.trim();
   const memory = memoryContext?.trim();
   const sections = [
     SYSTEM_PROMPT,
@@ -79,7 +77,6 @@ export function buildSystemPrompt(
     memoryEnabled && memory
       ? `<memory_context trust="trusted">${escapeXmlText(memory)}</memory_context>`
       : '',
-    extra ? `<runtime_context>${extra}</runtime_context>` : '',
   ].filter(Boolean);
   return `<pagent_prompt>\n${sections.join('\n')}\n</pagent_prompt>`;
 }

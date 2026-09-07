@@ -36,11 +36,46 @@ export type TurnUsage = {
   toolCalls: number;
 };
 
+export type UserBadge =
+  | { type: 'tab'; id: number; title: string }
+  | { type: 'command'; key: string; name: string }
+  | { type: 'element'; name?: string; tag?: string };
+
+export type PageReference = {
+  type: 'page';
+  tabId: number;
+  title: string;
+  url: string;
+  active?: boolean;
+  content?: string;
+  truncated?: boolean;
+  error?: string;
+};
+
+export type CommandReference = {
+  type: 'command';
+  key: string;
+  name: string;
+  desc?: string;
+  prompt: string;
+};
+
+export type ElementReference = {
+  type: 'element';
+  name?: string;
+  tag?: string;
+  element?: unknown;
+};
+
+export type UserReference = PageReference | CommandReference | ElementReference;
+
 export type ChatMessage = {
   id: string;
   role: ChatRole;
   content: string;
   imageDataUrl?: string;
+  badges?: UserBadge[];
+  references?: UserReference[];
   thinking?: string;
   tools?: ChatToolCall[];
   parts?: AssistantPart[];

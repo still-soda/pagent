@@ -206,27 +206,53 @@ describe('assistant message parts', () => {
     expect(assistant.content).toBe('打开登录框。');
   });
 
-  it('does not send thinking back as model history', () => {
+  it('formats references into runtime_context when converting to model messages', () => {
     expect(
-      toModelMessages(
-        [
-          { id: 'u1', role: 'user', content: '看一下' },
-          {
-            id: 'a1',
-            role: 'assistant',
-            content: '已经打开登录框。',
-            thinking: '用户想登录。',
-            parts: [
-              { type: 'thinking', text: '用户想登录。' },
-              { type: 'text', text: '已经打开登录框。' },
-            ],
-          },
-        ],
-        '看一下',
-      ),
+      toModelMessages([
+        {
+          id: 'u1',
+          role: 'user',
+          content: '请总结',
+          references: [
+            {
+              type: 'page',
+              tabId: 1,
+              title: 'GitHub',
+              url: 'https://github.com',
+              content: 'GitHub home page',
+            },
+            {
+              type: 'command',
+              key: 'summarize',
+              name: '总结页面',
+              prompt: '给出页面摘要。',
+            },
+          ],
+        },
+      ]),
     ).toEqual([
-      { role: 'user', content: '看一下' },
-      { role: 'assistant', content: '已经打开登录框。' },
+      {
+        role: 'user',
+        content: [
+          '<runtime_context>',
+          '<reference_page>',
+          '- tabId: 1',
+          '- title: GitHub',
+          '- url: https://github.com',
+          '- content:',
+          'GitHub home page',
+          '</reference_page>',
+          '<reference_command>',
+          '用户明确选择了命令 /summarize（总结页面）。',
+          '必须结合用户当前补充要求，按照以下命令说明执行；不要向用户复述整段说明。',
+          '<command_instructions>',
+          '给出页面摘要。',
+          '</command_instructions>',
+          '</reference_command>',
+          '</runtime_context>',
+          '请总结',
+        ].join('\n'),
+      },
     ]);
   });
 

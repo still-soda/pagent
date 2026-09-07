@@ -102,6 +102,34 @@ describe('rpc schemas', () => {
     });
   });
 
+  it('accepts references and badges when starting an agent', () => {
+    expect(
+      parseRpcPayload('agent.start', {
+        prompt: '总结这个页面',
+        badges: [
+          { type: 'tab', id: 1, title: 'GitHub' },
+          { type: 'command', key: 'summarize', name: '总结页面' },
+          { type: 'element', name: '提交按钮', tag: 'button' },
+        ],
+        references: [
+          { type: 'page', tabId: 1, title: 'GitHub', url: 'https://github.com' },
+          { type: 'command', key: 'summarize', name: '总结页面', prompt: '总结' },
+        ],
+      }),
+    ).toMatchObject({
+      prompt: '总结这个页面',
+      badges: [
+        { type: 'tab', id: 1, title: 'GitHub' },
+        { type: 'command', key: 'summarize', name: '总结页面' },
+        { type: 'element', name: '提交按钮', tag: 'button' },
+      ],
+      references: [
+        { type: 'page', tabId: 1, title: 'GitHub', url: 'https://github.com' },
+        { type: 'command', key: 'summarize', name: '总结页面', prompt: '总结' },
+      ],
+    });
+  });
+
   it('accepts raw screenshots and image attachments', () => {
     expect(parseRpcPayload('screenshot.capture', { raw: true })).toEqual({ raw: true });
     expect(

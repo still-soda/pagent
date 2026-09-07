@@ -173,6 +173,50 @@ export const modelsListPayloadSchema = z.object({
   force: z.boolean().optional(),
 });
 
+export const userBadgeSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('tab'),
+    id: z.number().int(),
+    title: z.string(),
+  }),
+  z.object({
+    type: z.literal('command'),
+    key: z.string(),
+    name: z.string(),
+  }),
+  z.object({
+    type: z.literal('element'),
+    name: z.string().optional(),
+    tag: z.string().optional(),
+  }),
+]);
+
+export const userReferenceSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('page'),
+    tabId: z.number().int(),
+    title: z.string(),
+    url: z.string(),
+    active: z.boolean().optional(),
+    content: z.string().optional(),
+    truncated: z.boolean().optional(),
+    error: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal('command'),
+    key: z.string(),
+    name: z.string(),
+    desc: z.string().optional(),
+    prompt: z.string(),
+  }),
+  z.object({
+    type: z.literal('element'),
+    name: z.string().optional(),
+    tag: z.string().optional(),
+    element: z.unknown().optional(),
+  }),
+]);
+
 export const rpcSchemas = {
   'dom.observe': observePayloadSchema,
   'dom.changes.start': z.object({
@@ -263,6 +307,8 @@ export const rpcSchemas = {
     prompt: z.string().min(1),
     context: z.string().optional(),
     imageDataUrl: z.string().startsWith('data:image/').optional(),
+    badges: z.array(userBadgeSchema).optional(),
+    references: z.array(userReferenceSchema).optional(),
     tabId: z.number().int().optional(),
     conversationId: z.string().optional(),
     history: z.array(z.any()).optional(),

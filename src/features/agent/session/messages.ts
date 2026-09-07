@@ -3,8 +3,13 @@ import type {
   AssistantToolPart,
   ChatMessage,
   ChatToolCall,
+  CommandReference,
+  ElementReference,
+  PageReference,
   TaskStatus,
   TurnUsage,
+  UserBadge,
+  UserReference,
 } from '@/shared/contracts/session-messages';
 import { toolLabel } from './tool-display';
 import { redactText, redactValue } from '@/shared/contracts/policy';
@@ -288,6 +293,58 @@ export function settleAssistantMessages(
   return changed ? next : messages;
 }
 
+export function formatReferencesPrompt(references?: UserReference[]): string {
+  if (!references || references.length === 0) return '';
+  const blocks: string[] = [];
+
+  for (const ref of references) {
+    if (ref.type === 'page') {
+      const parts: string[] = [];
+      parts.push(`- tabId: ${ref.tabId}`);
+      parts.push(`- title: ${ref.title}`);
+      parts.push(`- url: ${ref.url || '未知 URL'}`);
+      if (ref.active) parts.push('- active: true');
+      if (ref.error) parts.push(`- error: ${ref.error}`);
+      if (ref.content) {
+        parts.push(`- content:\n${ref.content}`);
+      }
+      blocks.push(`<reference_page>\n${parts.join('\n')}\n</reference_page>`);
+    } else if (ref.type === 'command') {
+      const parts: string[] = [];
+      parts.push(`用户明确选择了命令 /${ref.key}（${ref.name}）。`);
+      if (ref.desc) parts.push(`说明：${ref.desc}`);
+      parts.push('必须结合用户当前补充要求，按照以下命令说明执行；不要向用户复述整段说明。');
+      parts.push('<command_instructions>');
+      parts.push(ref.prompt);
+      parts.push('</command_instructions>');
+      blocks.push(`<reference_command>\n${parts.join('\n')}\n</reference_command>`);
+    } else if (ref.type === 'element') {
+      const parts: string[] = [];
+      if (ref.name) parts.push(`- name: ${ref.name}`);
+      if (ref.tag) parts.push(`- tag: ${ref.tag}`);
+      if (ref.element != null) {
+        parts.push(`- detail:\n${typeof ref.element === 'string' ? ref.element : JSON.stringify(ref.element, null, 2)}`);
+      }
+      blocks.push(`<reference_element>\n${parts.join('\n')}\n</reference_element>`);
+    }
+  }
+
+  if (blocks.length === 0) return '';
+  return `<runtime_context>\n${blocks.join('\n')}\n</runtime_context>`;
+}
+
+export function formatUserMessageContent(
+  content: string,
+  references?: UserReference[],
+  rawContext?: string,
+): string {
+  const runtimeContext = formatReferencesPrompt(references);
+  const extraContext = rawContext?.trim() ? `<runtime_context>\n${rawContext.trim()}\n</runtime_context>` : '';
+  const prefix = runtimeContext || extraContext;
+  if (!prefix) return content;
+  return content ? `${prefix}\n${content}` : prefix;
+}
+
 export function toModelMessages(
   history: ChatMessage[],
   prompt?: string,
@@ -318,13 +375,23 @@ export function toModelMessages(
       );
       if (tools.length) content = `已执行：${tools.map((tool) => toolLabel(tool.name)).join('、')}`;
     }
-    if (!content) continue;
+    if (!content && message.role === 'user' && message.references?.length) {
+      content = '';
+    } else if (!content) {
+      continue;
+    }
+
+    const formattedContent =
+      message.role === 'user'
+        ? formatUserMessageContent(content, message.references)
+        : content;
+
     converted.push({
       role: message.role,
       content:
         message.role === 'user' && message.imageDataUrl
-          ? modelUserContent(content, message.imageDataUrl)
-          : content,
+          ? modelUserContent(formattedContent, message.imageDataUrl)
+          : formattedContent,
     });
   }
   const last = converted.at(-1);
@@ -340,10 +407,16 @@ export function toModelMessages(
   return converted;
 }
 
-export function modelUserContent(prompt: string, imageDataUrl?: string) {
-  if (!imageDataUrl) return prompt;
+export function modelUserContent(
+  prompt: string,
+  imageDataUrl?: string,
+  references?: UserReference[],
+  rawContext?: string,
+) {
+  const formattedPrompt = formatUserMessageContent(prompt, references, rawContext);
+  if (!imageDataUrl) return formattedPrompt;
   return [
-    { type: 'text' as const, text: prompt },
+    { type: 'text' as const, text: formattedPrompt },
     {
       type: 'image_url' as const,
       image_url: { url: imageDataUrl },
