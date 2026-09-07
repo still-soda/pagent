@@ -40,10 +40,6 @@ export const mcpConfigItem = storage.defineItem<McpConfig>('local:pagent-mcp-con
   fallback: EMPTY_MCP_CONFIG,
 });
 
-export const checkpointItem = storage.defineItem<Checkpoint | null>('local:pagent-checkpoint', {
-  fallback: null,
-});
-
 export const checkpointsItem = storage.defineItem<Record<string, Checkpoint>>(
   'local:pagent-checkpoints',
   { fallback: {} },
@@ -377,7 +373,6 @@ export async function resetSessionStorageForTests(): Promise<void> {
     vaultsItem.setValue({}),
     tabUiItem.setValue({}),
     sessionScopeItem.setValue(''),
-    checkpointItem.setValue(null),
     checkpointsItem.setValue({}),
   ]);
 }

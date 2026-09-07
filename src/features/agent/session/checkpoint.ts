@@ -1,4 +1,4 @@
-import { checkpointItem, checkpointsItem } from '@/shared/storage/storage';
+import { checkpointsItem } from '@/shared/storage/storage';
 import type { ChatMessage, Checkpoint, TaskRow } from '@/shared/contracts/session';
 
 let checkpointWrite: Promise<unknown> = Promise.resolve();
@@ -25,15 +25,11 @@ export async function saveCheckpoint(partial: Checkpoint): Promise<Checkpoint> {
 
 export async function loadCheckpoint(): Promise<Checkpoint | null> {
   const all = await checkpointsItem.getValue();
-  return Object.values(all).sort((left, right) => right.updatedAt - left.updatedAt)[0] ??
-    checkpointItem.getValue();
+  return Object.values(all).sort((left, right) => right.updatedAt - left.updatedAt)[0] ?? null;
 }
 
 export async function loadCheckpoints(): Promise<Record<string, Checkpoint>> {
-  const all = await checkpointsItem.getValue();
-  const legacy = await checkpointItem.getValue();
-  if (legacy) all[checkpointKey(legacy)] = legacy;
-  return all;
+  return checkpointsItem.getValue();
 }
 
 export async function clearCheckpoint(key?: string): Promise<void> {
@@ -45,7 +41,6 @@ export async function clearCheckpoint(key?: string): Promise<void> {
     } else {
       await checkpointsItem.setValue({});
     }
-    await checkpointItem.setValue(null);
   });
   checkpointWrite = write.catch(() => undefined);
   await write;
