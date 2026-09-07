@@ -47,7 +47,7 @@ export function applyStreamPending(
         messages: applyAssistantThinking(next.messages, pending.reasoning, nowId('m')),
       };
     }
-    if (pending.tools.length) {
+    if (pending.tools?.length) {
       let list = [next];
       for (const event of pending.tools) {
         list = applyAgentEventToConversations(list, pending.targetId, event);

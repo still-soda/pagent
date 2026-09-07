@@ -27,7 +27,7 @@ describe('agent-session-reducer', () => {
   });
 
   it('applies stream pending token updates', () => {
-    const next = applyStreamPending([base], { targetId: 'c1', token: 'hello', reasoning: '' });
+    const next = applyStreamPending([base], { targetId: 'c1', token: 'hello', reasoning: '', tools: [] });
     expect(next[0]?.messages.at(-1)?.content).toContain('hello');
   });
 
