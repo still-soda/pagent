@@ -380,13 +380,13 @@ export function AgentApp({
               view={session.view}
               onViewChange={session.setView}
               onClose={() => onOpenChange(false)}
-              onSubmit={(prompt, context, attachedImage) => {
+              onSubmit={(prompt, context, attachedImage, badges, references) => {
                 setImageDataUrl(undefined);
                 setSelectedElement(undefined);
                 if (teaching.session?.status === 'reviewing') {
                   void teaching.revise(prompt);
                 } else {
-                  void session.send(prompt, context, attachedImage);
+                  void session.send(prompt, context, attachedImage, badges, references);
                 }
               }}
               onStop={() => void session.stop()}

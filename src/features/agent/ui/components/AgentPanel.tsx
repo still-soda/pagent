@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { PointerEvent, UIEvent, WheelEvent } from 'react';
-import { IconEye } from '@tabler/icons-react';
+import { IconBrowser, IconCommand, IconEye, IconPointer } from '@tabler/icons-react';
 import LoadingState from '@/shared/ui/beautiful-ui/primitives/LoadingState';
 import { SettingsPanel } from '@/features/settings/SettingsPanel';
 import { useStickToBottom } from '../hooks/useStickToBottom';
@@ -10,7 +10,7 @@ import {
   visibleWindow,
   visibleWindowStartId,
 } from '../message-window';
-import type { ChatMessage, TaskRow } from '@/shared/contracts/session-messages';
+import type { ChatMessage, TaskRow, UserBadge, UserReference } from '@/shared/contracts/session-messages';
 import type { AgentSettings } from '@/shared/contracts/settings';
 import type { ObservedElement } from '@/shared/contracts/page';
 import { PanelHeader } from './PanelHeader';
@@ -98,7 +98,13 @@ export function AgentPanel({
   view: 'chat' | 'settings';
   onViewChange: (view: 'chat' | 'settings') => void;
   onClose: () => void;
-  onSubmit: (prompt: string, context?: string, imageDataUrl?: string) => void;
+  onSubmit: (
+    prompt: string,
+    context?: string,
+    imageDataUrl?: string,
+    badges?: UserBadge[],
+    references?: UserReference[],
+  ) => void;
   onStop: () => void;
   onClearSelection: () => void;
   onSettingsChange: (settings: AgentSettings) => void;
@@ -282,6 +288,47 @@ export function AgentPanel({
                           className="max-h-40 max-w-full rounded-lg object-contain"
                         />
                       )}
+                      {message.badges && message.badges.length > 0 && (
+                        <div className="flex flex-wrap gap-1 px-1 pt-0.5">
+                          {message.badges.map((badge, idx) => {
+                            if (badge.type === 'tab') {
+                              return (
+                                <span
+                                  key={`tab-${badge.id}-${idx}`}
+                                  className="flex h-5.5 items-center gap-1 rounded-chip bg-surface/80 px-1.5 text-[11px] text-ink-2 shadow-hairline"
+                                >
+                                  <IconBrowser size={12} stroke={2} className="shrink-0" />
+                                  <span className="max-w-36 truncate">{badge.title}</span>
+                                </span>
+                              );
+                            }
+                            if (badge.type === 'command') {
+                              return (
+                                <span
+                                  key={`cmd-${badge.key}-${idx}`}
+                                  className="flex h-5.5 items-center gap-1 rounded-chip bg-primary/12 px-1.5 text-[11px] font-medium text-accent-ink shadow-hairline"
+                                >
+                                  <IconCommand size={12} stroke={2} className="shrink-0" />
+                                  <span className="max-w-28 truncate">/{badge.key}</span>
+                                  {badge.name && <span className="max-w-24 truncate text-ink-3">({badge.name})</span>}
+                                </span>
+                              );
+                            }
+                            if (badge.type === 'element') {
+                              return (
+                                <span
+                                  key={`el-${idx}`}
+                                  className="flex h-5.5 items-center gap-1 rounded-chip bg-surface/80 px-1.5 text-[11px] text-ink-2 shadow-hairline"
+                                >
+                                  <IconPointer size={12} stroke={2} className="shrink-0" />
+                                  <span className="max-w-36 truncate">{badge.name || (badge.tag ? `<${badge.tag}>` : '页面元素')}</span>
+                                </span>
+                              );
+                            }
+                            return null;
+                          })}
+                        </div>
+                      )}
                       <span className="px-1.5">{message.content}</span>
                     </div>
                   </div>
@@ -320,9 +367,9 @@ export function AgentPanel({
           <Composer
             settings={settings}
             running={running}
-            onSubmit={(prompt, context, attachedImage) => {
+            onSubmit={(prompt, context, attachedImage, badges, references) => {
               setVisibleFromId((current) => visibleWindowStartId(sourceMessages, current));
-              onSubmit(prompt, context, attachedImage);
+              onSubmit(prompt, context, attachedImage, badges, references);
             }}
             onStop={onStop}
             onSettingsChange={onSettingsChange}

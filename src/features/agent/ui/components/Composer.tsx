@@ -10,6 +10,7 @@ import {
   type ProviderId,
 } from '@/shared/contracts/settings';
 import type { ObservedElement } from '@/shared/contracts/page';
+import type { UserBadge, UserReference } from '@/shared/contracts/session-messages';
 
 export function Composer({
   settings,
@@ -29,7 +30,13 @@ export function Composer({
 }: {
   settings: AgentSettings;
   running: boolean;
-  onSubmit: (prompt: string, context?: string, imageDataUrl?: string) => void;
+  onSubmit: (
+    prompt: string,
+    context?: string,
+    imageDataUrl?: string,
+    badges?: UserBadge[],
+    references?: UserReference[],
+  ) => void;
   onStop: () => void;
   onSettingsChange: (settings: AgentSettings) => void;
   imageDataUrl?: string;

@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { rpc } from '@/shared/extension/rpc-client';
 import type { ObservedElement } from '@/shared/contracts/page';
 import type { SavedCommand } from '@/shared/contracts/teaching';
+import type { UserBadge, UserReference } from '@/shared/contracts/session-messages';
 import { Badge } from '@/shared/ui/badge';
 import {
   applyComposerInsertion,
@@ -126,7 +127,13 @@ export default function PromptBar({
   /** hero sizing: a multi-line input with controls on their own row */
   tall?: boolean;
   placeholder?: string;
-  onSend?: (text: string, context?: string, imageDataUrl?: string) => void;
+  onSend?: (
+    text: string,
+    context?: string,
+    imageDataUrl?: string,
+    badges?: UserBadge[],
+    references?: UserReference[],
+  ) => void;
   /** while running the send control becomes a stop button */
   running?: boolean;
   onStop?: () => void;
@@ -470,25 +477,63 @@ export default function PromptBar({
     }
     closeMenus();
     try {
-      let tabsContext = mentionedTabsContext(selectedMentions) || undefined;
+      let snapshots: MentionedTabSnapshot[] = [];
       if (!demo && selectedMentions.length > 0) {
         try {
-          const snapshots = (await rpc("tabs.snapshot", {
+          snapshots = (await rpc("tabs.snapshot", {
             tabIds: selectedMentions.map((tab) => tab.id),
           })) as MentionedTabSnapshot[];
-          tabsContext = mentionedTabsContext(selectedMentions, snapshots) || undefined;
         } catch {
-          // Keep the metadata-only context when one or more pages cannot be read.
+          // Keep empty snapshots when one or more pages cannot be read.
         }
       }
-      const commandContext = selectedFlowCommand
-        ? slashCommandContext(selectedFlowCommand)
-        : undefined;
-      const elementContext = selectedElement
-        ? `用户选中的当前页面元素：\n${JSON.stringify(selectedElement, null, 2)}`
-        : undefined;
-      const context = mergeComposerContexts(tabsContext, commandContext, elementContext);
-      onSend?.(text, context, imageDataUrl);
+
+      const references: UserReference[] = [];
+      for (const tab of selectedMentions) {
+        const snapshot = snapshots.find((s) => s.tabId === tab.id);
+        references.push({
+          type: 'page',
+          tabId: tab.id,
+          title: tab.title,
+          url: tab.url,
+          active: tab.active,
+          content: snapshot?.content,
+          truncated: snapshot?.truncated,
+          error: snapshot?.error,
+        });
+      }
+
+      if (selectedFlowCommand) {
+        references.push({
+          type: 'command',
+          key: selectedFlowCommand.key,
+          name: selectedFlowCommand.name,
+          desc: selectedFlowCommand.desc,
+          prompt: selectedFlowCommand.prompt,
+        });
+      }
+
+      if (selectedElement) {
+        references.push({
+          type: 'element',
+          name: selectedElement.name,
+          tag: selectedElement.tag,
+          element: selectedElement,
+        });
+      }
+
+      const userBadges: UserBadge[] = [
+        ...selectedMentions.map((tab) => ({ type: 'tab' as const, id: tab.id, title: tab.title })),
+        ...(selectedFlowCommand ? [{ type: 'command' as const, key: selectedFlowCommand.key, name: selectedFlowCommand.name }] : []),
+        ...(selectedElement ? [{ type: 'element' as const, name: selectedElement.name, tag: selectedElement.tag }] : []),
+      ];
+      onSend?.(
+        text,
+        undefined,
+        imageDataUrl,
+        userBadges.length > 0 ? userBadges : undefined,
+        references.length > 0 ? references : undefined,
+      );
     } finally {
       setPreparing(false);
     }

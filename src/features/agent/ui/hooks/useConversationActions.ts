@@ -9,7 +9,7 @@ import {
   titleFromPrompt,
 } from '@/features/agent/session/conversations';
 import { conversationVaultKey } from '@/features/agent/session/vault';
-import type { PageConversation } from '@/shared/contracts/session';
+import type { PageConversation, UserBadge, UserReference } from '@/shared/contracts/session';
 import { nowId } from '@/shared/utils/utils';
 import { patchConversation } from './agent-session-reducer';
 
@@ -49,7 +49,13 @@ export function useConversationActions(options: {
     bumpRevision,
   } = options;
 
-  const send = useCallback(async (prompt: string, context?: string, imageDataUrl?: string) => {
+  const send = useCallback(async (
+    prompt: string,
+    context?: string,
+    imageDataUrl?: string,
+    badges?: UserBadge[],
+    references?: UserReference[],
+  ) => {
     const id = activeIdRef.current;
     runningIdRef.current = id;
     setWorkingOnThisPage(true);
@@ -66,7 +72,7 @@ export function useConversationActions(options: {
       title: titleFromPrompt(item.title, prompt),
       messages: [
         ...item.messages,
-        { id: nowId('m'), role: 'user', content: prompt, imageDataUrl },
+        { id: nowId('m'), role: 'user', content: prompt, imageDataUrl, badges, references },
       ],
     }));
     conversationsRef.current = nextConversations;
@@ -83,6 +89,8 @@ export function useConversationActions(options: {
       prompt,
       context,
       imageDataUrl,
+      badges,
+      references,
       conversationId: id,
       history,
     });
