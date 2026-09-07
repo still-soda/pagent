@@ -1,6 +1,6 @@
 import { CHANNEL, isRpcRequest } from '@/shared/contracts/rpc';
 import { toErrorMessage } from '@/shared/contracts/errors';
-import { clearTabUi, migrateLegacyPageStores } from '@/shared/storage/storage';
+import { clearTabUi } from '@/shared/storage/storage';
 import { getActiveTab } from '@/shared/browser/tabs';
 import { TOGGLE_PANEL_COMMAND } from '@/shared/extension/hotkey';
 import { installServiceWorkerKeepAlive } from '@/shared/extension/keepalive';
@@ -14,7 +14,6 @@ import { recordBrowserAction } from '@/features/teaching/background/teaching-con
 
 export default defineBackground(() => {
   installServiceWorkerKeepAlive();
-  void migrateLegacyPageStores().catch(() => {});
   void recoverInterruptedSessions().catch(() => {});
   void syncMcpServers().catch((error) => console.warn('MCP 连接失败', error));
 

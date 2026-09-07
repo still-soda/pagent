@@ -269,17 +269,6 @@ export async function loadConversationsForPage(
   return viewForVault(domain, vault, live ?? sessionStore);
 }
 
-export async function migrateLegacyPageStores(): Promise<void> {
-  await ensureSessionStorage();
-  const all = await idbGetAll<PageConversationStore>(SESSION_STORES.conversations);
-  for (const [key, store] of Object.entries(all)) {
-    if (key.startsWith('tab:') || isSparseStore(store)) continue;
-    const domain = conversationVaultKey(key);
-    if (!domain) continue;
-    await saveVaultFromStore(domain, store, { deleteMissing: false });
-  }
-}
-
 export async function loadSettings(): Promise<AgentSettings> {
   const stored = await settingsItem.getValue();
   const settings = {
