@@ -43,8 +43,17 @@ export async function retargetAgent(fromTabId: number, toTabId: number): Promise
   if (!control) return;
   const displaced = findRunningByTab(toTabId);
   if (displaced && displaced !== control) {
-    displaced.abort.abort();
-    running.delete(toTabId);
+    let targetUrl = '';
+    try {
+      const tab = await browser.tabs.get(toTabId);
+      targetUrl = tab?.url || '';
+    } catch {
+      // ignore
+    }
+    const hint = targetUrl ? `使用 tabs.create("${targetUrl}") 打开新标签页` : '使用 tabs.create 打开新标签页';
+    throw new Error(
+      `标签页 (tabId: ${toTabId}) 正在被另一个活跃的 Agent 任务占用。为避免冲突，已阻止切换到该标签页。建议${hint}以继续执行。`,
+    );
   }
   const live = tabStores.get(fromTabId);
   running.delete(control.tabId);
