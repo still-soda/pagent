@@ -36,7 +36,8 @@ export async function rpc<K extends RpcName>(
     } catch (error) {
       lastError = error;
       if (!shouldRetryRpc(name, error) || attempt === 2) break;
-      await new Promise((resolve) => setTimeout(resolve, 80 * (attempt + 1)));
+      // 指数回退：80ms * 2^attempt (80ms, 160ms, 320ms)
+      await new Promise((resolve) => setTimeout(resolve, 80 * (2 ** attempt)));
     }
   }
   throw lastError instanceof Error ? lastError : new Error(`RPC 失败：${name}`);
