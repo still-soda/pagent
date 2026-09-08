@@ -134,14 +134,13 @@ export async function retryWithBackoff<T>(
   fn: () => Promise<T>,
   options: {
     maxRetries?: number;
-    initialDelayMs?: number;
+    delayMs?: number;
     signal?: AbortSignal;
     onRetry?: (attempt: number, delayMs: number, error: unknown) => void;
   } = {},
 ): Promise<T> {
-  const { maxRetries = 3, initialDelayMs = 2000, signal, onRetry } = options;
+  const { maxRetries = 5, delayMs = 1000, signal, onRetry } = options;
   let attempt = 0;
-  let delay = initialDelayMs;
 
   for (;;) {
     try {
@@ -156,16 +155,16 @@ export async function retryWithBackoff<T>(
         throw error;
       }
 
-      const retryAfter = parseRetryAfterMs(error, delay);
-      const waitMs = Math.max(delay, retryAfter);
-      onRetry?.(attempt, waitMs, error);
+      // 指数回退：delayMs * 2^(attempt - 1)，最大 60 秒
+      const exponentialDelay = Math.min(delayMs * (2 ** (attempt - 1)), 60000);
+      onRetry?.(attempt, exponentialDelay, error);
 
       await new Promise<void>((resolve, reject) => {
         if (signal?.aborted) return reject(abortedError());
         const timer = setTimeout(() => {
           signal?.removeEventListener('abort', onAbort);
           resolve();
-        }, waitMs);
+        }, exponentialDelay);
         const onAbort = () => {
           clearTimeout(timer);
           signal?.removeEventListener('abort', onAbort);
@@ -173,8 +172,6 @@ export async function retryWithBackoff<T>(
         };
         signal?.addEventListener('abort', onAbort);
       });
-
-      delay = Math.min(delay * 2, 30000);
     }
   }
 }
@@ -203,11 +200,11 @@ export function createSafetyMiddleware(options: {
       const result = await retryWithBackoff(
         () => raceAbort(options.signal, handler(request)),
         {
-          maxRetries: 3,
-          initialDelayMs: 2500,
+          maxRetries: 5,
+          delayMs: 1000,
           signal: options.signal,
           onRetry: (attempt, waitMs) => {
-            options.onStatus?.(`触发频率或配额限制，正在等待 ${(waitMs / 1000).toFixed(0)}s 后重试（第 ${attempt}/3 次）…`);
+            options.onStatus?.(`触发频率或配额限制，正在等待 ${(waitMs / 1000).toFixed(0)}s 后重试（第 ${attempt}/5 次）…`);
           },
         },
       );

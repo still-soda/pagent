@@ -80,18 +80,18 @@ describe('rate limit retry with backoff', () => {
     let calls = 0;
     const fn = vi.fn().mockImplementation(async () => {
       calls += 1;
-      if (calls < 3) {
+      if (calls < 4) {
         throw new Error('429 Too Many Requests. Resets in 1s');
       }
       return 'success';
     });
 
     const result = await retryWithBackoff(fn, {
-      maxRetries: 3,
-      initialDelayMs: 10,
+      maxRetries: 5,
+      delayMs: 10,
     });
 
     expect(result).toBe('success');
-    expect(calls).toBe(3);
+    expect(calls).toBe(4);
   });
 });
