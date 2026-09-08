@@ -133,8 +133,7 @@ export default defineContentScript({
   runAt: 'document_idle',
 
   async main(ctx) {
-    // 单例保护：manifest 注入与程序化补注入可能并发，重复 main() 会导致
-    // 多个 pagent-root 的顶层 observer 互抢 DOM 末位，卡死渲染进程。
+    // 单例保护
     if (alreadyInstalled()) return;
 
     browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {

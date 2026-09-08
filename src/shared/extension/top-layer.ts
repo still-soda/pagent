@@ -56,8 +56,6 @@ export function promoteHostToTopLayer(host: HTMLElement) {
   showAsManualPopover(host);
 }
 
-// 全页只允许一个顶层 host。若因重复注入出现多个实例，后来的实例必须退出，
-// 否则两个 MutationObserver 会互相把对方挤下 lastElementChild，形成无限 append 循环。
 let activeTopLayerHost: HTMLElement | null = null;
 
 export function attachTopLayer(host: HTMLElement): () => void {
