@@ -172,4 +172,40 @@ describe('PageObserver', () => {
     expect(result.scopeReason).toContain('自动回退');
     expect(result.elements.some((item) => item.name === '页面按钮')).toBe(true);
   });
+
+  it('records cursor property on observed elements and recognizes full-page cursor targets', () => {
+    document.body.innerHTML = `
+      <div id="clickable-card" style="cursor: pointer">
+        <span>卡片标题</span>
+      </div>
+      <div id="drag-slider" style="cursor: grab">拖拽条</div>
+    `;
+    const card = document.getElementById('clickable-card')!;
+    const slider = document.getElementById('drag-slider')!;
+    card.getBoundingClientRect = () => ({
+      x: 10, y: 10, top: 10, left: 10, right: 210, bottom: 60, width: 200, height: 50,
+      toJSON: () => ({}),
+    });
+    slider.getBoundingClientRect = () => ({
+      x: 10, y: 70, top: 70, left: 10, right: 210, bottom: 110, width: 200, height: 40,
+      toJSON: () => ({}),
+    });
+
+    const result = new PageObserver().observe();
+    const observedCard = result.elements.find((item) => item.name === '卡片标题');
+    const observedSlider = result.elements.find((item) => item.name === '拖拽条');
+
+    expect(observedCard).toMatchObject({
+      clickable: true,
+      actionable: true,
+      cursor: 'pointer',
+      actions: expect.arrayContaining(['activate']),
+    });
+    expect(observedSlider).toMatchObject({
+      clickable: true,
+      actionable: true,
+      cursor: 'grab',
+      actions: expect.arrayContaining(['activate']),
+    });
+  });
 });

@@ -30,6 +30,7 @@ export type ObservedElement = {
   label?: string;
   description?: string;
   type?: string;
+  cursor?: string;
   value?: string;
   valueText?: string;
   href?: string;

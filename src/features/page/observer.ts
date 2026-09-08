@@ -36,6 +36,19 @@ const INTERACTIVE = [
 
 export const SKIP = 'script, style, noscript, svg, path, pagent-root, [data-pagent-ui]';
 
+export const INTERACTIVE_CURSORS = new Set([
+  'pointer',
+  'grab',
+  'grabbing',
+  'zoom-in',
+  'zoom-out',
+  'copy',
+  'move',
+  'crosshair',
+  'col-resize',
+  'row-resize',
+]);
+
 export class PageObserver {
   revision = 1;
   documentId = nowId('doc');
@@ -86,8 +99,7 @@ export class PageObserver {
       const records: ObservedElement[] = [];
       const seen = new Set<Element>();
       const scanRoot = activeContext ?? root;
-      const selector = activeContext ? `${INTERACTIVE},li,td` : INTERACTIVE;
-      const candidates = collectAcrossRoots(scanRoot, selector)
+      const candidates = collectInteractiveCandidates(scanRoot, activeContext)
         .filter((el) => !el.closest(SKIP))
         .sort((left, right) => interactionScore(right) - interactionScore(left));
 
@@ -207,7 +219,8 @@ export class PageObserver {
     const disabled = 'disabled' in html
       ? Boolean((html as HTMLInputElement).disabled)
       : html.getAttribute('aria-disabled') === 'true';
-    const actions = supportedActions(el, role, disabled);
+    const actions = supportedActions(el, role, disabled, style);
+    const cursor = isCursorOrigin(el, style) ? style.cursor : undefined;
     const value = 'value' in html
       ? redactText(truncate(String((html as HTMLInputElement).value ?? ''), 80))
       : undefined;
@@ -221,6 +234,7 @@ export class PageObserver {
       label: label ? redactText(truncate(label, 120)) : undefined,
       description: description ? redactText(truncate(description, 160)) : undefined,
       type: html.getAttribute('type') ?? undefined,
+      cursor,
       value,
       valueText: valueText ? redactText(truncate(valueText, 120)) : undefined,
       href: html instanceof HTMLAnchorElement ? html.href : undefined,
@@ -337,12 +351,56 @@ function collectAcrossRoots(root: Document | ShadowRoot | Element, selector: str
   return found;
 }
 
+export function isCursorOrigin(el: Element, style?: CSSStyleDeclaration): boolean {
+  const doc = el.ownerDocument;
+  if (!doc || el === doc.body || el === doc.documentElement) return false;
+  const view = doc.defaultView ?? (typeof window !== 'undefined' ? window : undefined);
+  const computed = style ?? view?.getComputedStyle(el);
+  const cursor = computed?.cursor;
+  if (!cursor || !INTERACTIVE_CURSORS.has(cursor)) return false;
+
+  const parent = el.parentElement;
+  if (!parent) return true;
+
+  const html = el as HTMLElement;
+  if (html.style && html.style.cursor && INTERACTIVE_CURSORS.has(html.style.cursor)) {
+    return true;
+  }
+
+  const parentStyle = view?.getComputedStyle(parent);
+  return parentStyle?.cursor !== cursor;
+}
+
+function collectInteractiveCandidates(
+  scanRoot: Document | ShadowRoot | Element,
+  activeContext: Element | null,
+): Element[] {
+  const baseSelector = activeContext ? `${INTERACTIVE},li,td` : INTERACTIVE;
+  const semantic = collectAcrossRoots(scanRoot, baseSelector);
+  const seen = new Set(semantic);
+  const additional: Element[] = [];
+
+  const extraSelector = '[style*="cursor"],[class*="cursor"],[class*="pointer"],[onclick],div,span,li,td,th,tr,p,i,img,article,section';
+  const potentialCursorElements = collectAcrossRoots(scanRoot, extraSelector);
+  for (const el of potentialCursorElements) {
+    if (seen.has(el) || el.closest(SKIP)) continue;
+    if (isCursorOrigin(el)) {
+      seen.add(el);
+      additional.push(el);
+    }
+  }
+
+  return [...semantic, ...additional];
+}
+
 function interactionScore(el: Element): number {
   const role = el.getAttribute('role') || implicitRole(el);
   if (/^(input|textarea|select|button)$/i.test(el.tagName)) return 5;
   if (['textbox', 'combobox', 'checkbox', 'radio', 'slider', 'spinbutton', 'switch'].includes(role)) return 4;
   if (['button', 'link', 'option', 'menuitem'].includes(role)) return 3;
   if (el instanceof HTMLLabelElement) return 1;
+  const style = el.ownerDocument.defaultView?.getComputedStyle(el);
+  if (style?.cursor && INTERACTIVE_CURSORS.has(style.cursor)) return 3;
   return 2;
 }
 
@@ -410,7 +468,12 @@ function numericAttribute(el: Element, ...names: string[]): number | undefined {
   return undefined;
 }
 
-function supportedActions(el: Element, role: string, disabled: boolean): ElementAction[] {
+function supportedActions(
+  el: Element,
+  role: string,
+  disabled: boolean,
+  style?: CSSStyleDeclaration,
+): ElementAction[] {
   if (disabled) return [];
   const actions: ElementAction[] = [];
   if (
@@ -429,7 +492,7 @@ function supportedActions(el: Element, role: string, disabled: boolean): Element
     || role === 'radio'
     || role === 'switch'
   ) actions.push('set-checked');
-  if (isClickCapable(el, role)) actions.push('activate');
+  if (isClickCapable(el, role, style)) actions.push('activate');
   return [...new Set(actions)];
 }
 
@@ -440,7 +503,7 @@ function isClickCapable(el: Element, role: string, style = el.ownerDocument.defa
     || asTabIndex(el) >= 0
     || typeof html.onclick === 'function'
     || html.hasAttribute('onclick')
-    || style?.cursor === 'pointer';
+    || isCursorOrigin(el, style);
 }
 
 function isOffscreenFormControl(el: Element): boolean {
@@ -476,7 +539,7 @@ export function activeInteractionContext(root: Document = document): Element | n
       && style?.visibility !== 'hidden'
       && element.getAttribute('aria-hidden') !== 'true'
       && isTransientInteractionSurface(element, root, style)
-      && Boolean(element.querySelector(`${INTERACTIVE},li,td`));
+      && Boolean(element.querySelector(`${INTERACTIVE},li,td,[style*="cursor"],[class*="cursor"],[class*="pointer"]`));
   });
   return candidates
     .map((element) => ({ element, score: interactionContextScore(element) }))
