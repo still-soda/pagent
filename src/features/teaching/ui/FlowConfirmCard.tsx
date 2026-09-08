@@ -24,6 +24,7 @@ const ACTION_NAMES: Record<string, string> = {
   tab_switch: '切换标签',
   tab_open: '打开标签',
   tab_close: '关闭标签',
+  comment: '备注',
 };
 
 export function FlowConfirmCard({

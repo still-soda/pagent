@@ -52,6 +52,7 @@ const ACTION_LABELS: Record<RecordedAction['kind'], string> = {
   tab_switch: '切换标签页',
   tab_open: '打开标签页',
   tab_close: '关闭标签页',
+  comment: '备注',
 };
 
 function actionLine(action: RecordedAction, index?: number): string {

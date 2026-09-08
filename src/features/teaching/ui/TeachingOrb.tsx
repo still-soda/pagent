@@ -43,6 +43,7 @@ export function TeachingOrb({
           <div>
             <strong>正在示教</strong>
             <span>操作会持续记录</span>
+            <span className="text-[10px] text-ink-3 opacity-80">Alt+X 选中元素备注 · Alt+C 直接备注</span>
           </div>
           <button type="button" className="is-primary" onClick={onFinish}>结束并总结</button>
           <button type="button" onClick={onCancel}>取消</button>

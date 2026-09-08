@@ -105,6 +105,10 @@ export function useTeachingSession(pageUrl: string, conversationId?: string) {
     }
   }, []);
 
+  const addComment = useCallback((comment: string, element?: HTMLElement | null) => {
+    recorderRef.current?.recordComment(comment, element);
+  }, []);
+
   return {
     session,
     busy,
@@ -115,5 +119,6 @@ export function useTeachingSession(pageUrl: string, conversationId?: string) {
     revise,
     confirm,
     refresh,
+    addComment,
   };
 }

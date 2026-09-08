@@ -132,6 +132,22 @@ export function createTeachingRecorder(emit: Emit) {
     emit(actions);
   };
 
+  const recordComment = (comment: string, element?: HTMLElement | null) => {
+    if (!active) return;
+    const trimmed = redactText(comment.trim());
+    if (!trimmed) return;
+    batch.push({
+      id: id(),
+      at: Date.now(),
+      kind: 'comment',
+      page: page(),
+      target: element ? describeTarget(element) : undefined,
+      value: trimmed,
+      detail: trimmed,
+    });
+    flush();
+  };
+
   const queue = (
     kind: RecordedActionKind,
     element?: HTMLElement | null,
@@ -232,5 +248,5 @@ export function createTeachingRecorder(emit: Emit) {
     flush();
   };
 
-  return { start, stop, flush };
+  return { start, stop, flush, recordComment };
 }

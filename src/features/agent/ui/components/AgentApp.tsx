@@ -26,6 +26,11 @@ import { applyShadowTheme } from '@/shared/extension/theme';
 import { AgentPanel } from './AgentPanel';
 import { TeachingOrb } from '@/features/teaching/ui/TeachingOrb';
 import { useTeachingSession } from '@/features/teaching/ui/useTeachingSession';
+import { TeachingCommentPicker } from '@/features/teaching/ui/TeachingCommentPicker';
+import {
+  isTeachingCommentDirectHotkey,
+  isTeachingCommentElementHotkey,
+} from '@/shared/extension/hotkey';
 
 export function AgentApp({
   open,
@@ -58,6 +63,8 @@ export function AgentApp({
   const [imageDataUrl, setImageDataUrl] = useState<string>();
   const [selectingElement, setSelectingElement] = useState(false);
   const [selectedElement, setSelectedElement] = useState<ObservedElement>();
+  // teachingCommentMode: undefined = not commenting, 'pick' = picking element, 'direct' = direct comment without element, HTMLElement = element picked
+  const [teachingCommentMode, setTeachingCommentMode] = useState<'pick' | 'direct' | HTMLElement | undefined>(undefined);
   const [captureError, setCaptureError] = useState('');
   const [toolCaptureHidden, setToolCaptureHidden] = useState(false);
   const [celebrating, setCelebrating] = useState(false);
@@ -296,11 +303,37 @@ export function AgentApp({
     return () => window.clearTimeout(timer);
   }, [captureError]);
 
+  // 示教模式期间支持 Alt+X 选中元素备注，Alt+C 直接备注
+  useEffect(() => {
+    if (teaching.session?.status !== 'recording') return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isTeachingCommentElementHotkey(event)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        setTeachingCommentMode('pick');
+      } else if (isTeachingCommentDirectHotkey(event)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        setTeachingCommentMode('direct');
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown, true);
+    const shadowRoot = rootRef.current?.shadowRoot ?? rootRef.current;
+    shadowRoot?.addEventListener('keydown', onKeyDown as EventListener, true);
+
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true);
+      shadowRoot?.removeEventListener('keydown', onKeyDown as EventListener, true);
+    };
+  }, [teaching.session?.status]);
+
   const agentCapturingScreen = session.tasks.some(
     (task) => task.title === 'capture_screenshot' && task.status === 'running',
   );
   const panelHidden =
-    capturingScreen || toolCaptureHidden || agentCapturingScreen || selectingElement;
+    capturingScreen || toolCaptureHidden || agentCapturingScreen || selectingElement || teachingCommentMode === 'pick';
   const stopPanelEvent = (event: { stopPropagation: () => void }) => {
     event.stopPropagation();
   };
@@ -468,6 +501,22 @@ export function AgentApp({
             const description = pageObserver.describe(element);
             if (description) setSelectedElement(description);
             setSelectingElement(false);
+          }}
+        />
+      )}
+      {teachingCommentMode !== undefined && (
+        <TeachingCommentPicker
+          targetElement={
+            teachingCommentMode === 'direct'
+              ? null
+              : teachingCommentMode === 'pick'
+              ? undefined
+              : teachingCommentMode
+          }
+          onCancel={() => setTeachingCommentMode(undefined)}
+          onSubmit={(comment, element) => {
+            teaching.addComment(comment, element);
+            setTeachingCommentMode(undefined);
           }}
         />
       )}

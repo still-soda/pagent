@@ -11,7 +11,8 @@ export type RecordedActionKind =
   | 'reload'
   | 'tab_switch'
   | 'tab_open'
-  | 'tab_close';
+  | 'tab_close'
+  | 'comment';
 
 export type RecordedTarget = {
   tag: string;

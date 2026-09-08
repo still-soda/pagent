@@ -64,6 +64,35 @@ describe('teaching recorder', () => {
       expect.objectContaining({ kind: 'input', value: '[redacted]', redacted: true }),
     ]));
   });
+
+  it('records comments directly and on elements', () => {
+    const emitted: Array<{ kind: string; value?: string; target?: unknown }> = [];
+    const recorder = createTeachingRecorder((actions) => emitted.push(...actions));
+    const button = document.createElement('button');
+    button.textContent = '提交按钮';
+    document.body.append(button);
+
+    recorder.start();
+    recorder.recordComment('这是一条全局备注');
+    recorder.recordComment('点击前需要确认数据', button);
+    recorder.stop();
+
+    expect(emitted).toEqual([
+      expect.objectContaining({
+        kind: 'comment',
+        value: '这是一条全局备注',
+        target: undefined,
+      }),
+      expect.objectContaining({
+        kind: 'comment',
+        value: '点击前需要确认数据',
+        target: expect.objectContaining({
+          tag: 'button',
+          text: '提交按钮',
+        }),
+      }),
+    ]);
+  });
 });
 
 describe('teaching storage', () => {
