@@ -92,7 +92,7 @@ function registerTools(serverName: string, tools: RegisteredTool[]) {
   }
 }
 
-function unregisterTools(serverName: string, tools: RegisteredTool[]) {
+function unregisterTools(tools: RegisteredTool[]) {
   for (const tool of tools) toolRegistry.delete(tool.name);
 }
 
@@ -103,7 +103,7 @@ async function connectServer(
 ): Promise<void> {
   const previous = servers.get(name);
   if (previous) {
-    unregisterTools(name, previous.tools);
+    unregisterTools(previous.tools);
     await previous.client.close().catch(() => {});
     servers.delete(name);
   }
@@ -116,7 +116,7 @@ async function connectServer(
     return;
   }
   if (!REMOTE_SCHEMES.has(url.protocol)) {
-    servers.set(name, { name, url: config.url, client: undefined as unknown as Client, status: 'error', error: '浏览器扩展仅支持 http/https/ws/wss 远程服务器，不支持 stdio(command) 启动', tools: [] });
+    servers.set(name, { name, url: config.url, client: undefined as unknown as Client, status: 'error', error: `浏览器扩展仅支持 http/https/ws/wss 远程服务器，不支持 ${url.protocol}`, tools: [] });
     return;
   }
   if (!(await hasOriginAccess(config.url))) {
@@ -156,7 +156,7 @@ async function connectServer(
 async function disconnectServer(name: string): Promise<void> {
   const live = servers.get(name);
   if (!live) return;
-  unregisterTools(name, live.tools);
+  unregisterTools(live.tools);
   await live.client.close().catch(() => {});
   servers.delete(name);
 }
