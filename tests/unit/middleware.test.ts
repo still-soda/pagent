@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
+  isRateLimitError,
   isUnrecoverableToolError,
+  parseRetryAfterMs,
+  retryWithBackoff,
   toolFailureContent,
   toolMadeProgress,
   withElapsedPrefix,
@@ -56,5 +59,39 @@ describe('agent loop limits', () => {
     expect(toolMadeProgress('observe_page_changes', { content: '{"changed":true}' })).toBe(true);
     expect(toolMadeProgress('interact_elements', { content: '{"satisfied":true,"changed":false}' })).toBe(false);
     expect(toolMadeProgress('interact_elements', { content: '{"satisfied":true,"changed":true}' })).toBe(true);
+  });
+});
+
+describe('rate limit retry with backoff', () => {
+  it('detects rate limit errors', () => {
+    expect(isRateLimitError(new Error('429 Individual quota reached.'))).toBe(true);
+    expect(isRateLimitError(new Error('Rate limit exceeded'))).toBe(true);
+    expect(isRateLimitError({ status: 429 })).toBe(true);
+    expect(isRateLimitError(new Error('Other error'))).toBe(false);
+  });
+
+  it('parses reset duration from message', () => {
+    expect(parseRetryAfterMs(new Error('Resets in 16m37s.'))).toBe(60000); // capped at 60s
+    expect(parseRetryAfterMs(new Error('resets in 5s.'))).toBe(5000);
+    expect(parseRetryAfterMs(new Error('retry after 12s.'))).toBe(12000);
+  });
+
+  it('retries on 429 and resolves when succeeding', async () => {
+    let calls = 0;
+    const fn = vi.fn().mockImplementation(async () => {
+      calls += 1;
+      if (calls < 3) {
+        throw new Error('429 Too Many Requests. Resets in 1s');
+      }
+      return 'success';
+    });
+
+    const result = await retryWithBackoff(fn, {
+      maxRetries: 3,
+      initialDelayMs: 10,
+    });
+
+    expect(result).toBe('success');
+    expect(calls).toBe(3);
   });
 });

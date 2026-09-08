@@ -95,6 +95,90 @@ export function withElapsedPrefix<T>(result: T, elapsedMs: number): T {
   return result;
 }
 
+export function isRateLimitError(error: unknown): boolean {
+  if (!error) return false;
+  const msg = toErrorMessage(error).toLowerCase();
+  const status = (error as { status?: unknown })?.status ?? (error as { statusCode?: unknown })?.statusCode;
+  if (status === 429) return true;
+  return (
+    msg.includes('429') ||
+    msg.includes('rate limit') ||
+    msg.includes('quota reached') ||
+    msg.includes('too many requests') ||
+    msg.includes('model_rate_limit') ||
+    msg.includes('resource has been exhausted')
+  );
+}
+
+export function parseRetryAfterMs(error: unknown, fallbackMs = 3000): number {
+  if (!error) return fallbackMs;
+  const msg = toErrorMessage(error);
+  // e.g. "Resets in 16m37s" or "resets in 5s" or "retry after 10s"
+  const mMatch = /resets? in\s+(\d+)m(?:\s*(\d+)s)?/i.exec(msg);
+  if (mMatch && mMatch[1]) {
+    const minutes = parseInt(mMatch[1], 10) || 0;
+    const seconds = parseInt(mMatch[2] || '0', 10) || 0;
+    const totalMs = (minutes * 60 + seconds) * 1000;
+    if (totalMs > 0) return Math.min(totalMs, 60000); // 最多等待 60s
+  }
+  const sMatch = /(?:resets? in|retry after|try again in)\s+(\d+(?:\.\d+)?)\s*(?:s|sec|seconds?)/i.exec(msg);
+  if (sMatch && sMatch[1]) {
+    const seconds = parseFloat(sMatch[1]) || 0;
+    const totalMs = Math.round(seconds * 1000);
+    if (totalMs > 0) return Math.min(totalMs, 60000);
+  }
+  return fallbackMs;
+}
+
+export async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  options: {
+    maxRetries?: number;
+    initialDelayMs?: number;
+    signal?: AbortSignal;
+    onRetry?: (attempt: number, delayMs: number, error: unknown) => void;
+  } = {},
+): Promise<T> {
+  const { maxRetries = 3, initialDelayMs = 2000, signal, onRetry } = options;
+  let attempt = 0;
+  let delay = initialDelayMs;
+
+  for (;;) {
+    try {
+      if (signal?.aborted) throw abortedError();
+      return await fn();
+    } catch (error) {
+      if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
+        throw error;
+      }
+      attempt += 1;
+      if (attempt > maxRetries || !isRateLimitError(error)) {
+        throw error;
+      }
+
+      const retryAfter = parseRetryAfterMs(error, delay);
+      const waitMs = Math.max(delay, retryAfter);
+      onRetry?.(attempt, waitMs, error);
+
+      await new Promise<void>((resolve, reject) => {
+        if (signal?.aborted) return reject(abortedError());
+        const timer = setTimeout(() => {
+          signal?.removeEventListener('abort', onAbort);
+          resolve();
+        }, waitMs);
+        const onAbort = () => {
+          clearTimeout(timer);
+          signal?.removeEventListener('abort', onAbort);
+          reject(abortedError());
+        };
+        signal?.addEventListener('abort', onAbort);
+      });
+
+      delay = Math.min(delay * 2, 30000);
+    }
+  }
+}
+
 export function createSafetyMiddleware(options: {
   onBudget?: (usage: UsageState) => void;
   onStatus?: (text: string) => void;
@@ -116,7 +200,17 @@ export function createSafetyMiddleware(options: {
       usage.modelCalls += 1;
       options.onBudget?.(usage);
       options.onStatus?.('正在调用模型…');
-      const result = await raceAbort(options.signal, handler(request));
+      const result = await retryWithBackoff(
+        () => raceAbort(options.signal, handler(request)),
+        {
+          maxRetries: 3,
+          initialDelayMs: 2500,
+          signal: options.signal,
+          onRetry: (attempt, waitMs) => {
+            options.onStatus?.(`触发频率或配额限制，正在等待 ${(waitMs / 1000).toFixed(0)}s 后重试（第 ${attempt}/3 次）…`);
+          },
+        },
+      );
       const extracted = extractTurnUsage(result);
       if (extracted) usage.tokens = mergeTurnUsage(usage.tokens, extracted);
       options.onUsage?.(usage);
