@@ -186,8 +186,7 @@ export function nextConversationTitle(titles: string[]): string {
 export function titleFromPrompt(current: string, prompt: string): string {
   if (!/^会话 \d+$/.test(current)) return current;
   const text = prompt.replace(/\s+/g, ' ').trim();
-  if (!text) return current;
-  return text.length > 14 ? `${text.slice(0, 14)}…` : text;
+  return text || current;
 }
 
 const DAY_MS = 86_400_000;

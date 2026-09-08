@@ -247,21 +247,6 @@ export function SettingsPanel({
 
   return (
     <div ref={panelRef} className="space-y-3 text-sm text-ink">
-      {variant === 'panel' && (
-        <button
-          type="button"
-          onClick={() => void openDetailedSettings('archive')}
-          className="flex w-full items-center justify-between gap-3 rounded-card border border-line bg-surface px-3 py-2.5 text-left hover:bg-hover"
-        >
-          <span className="min-w-0">
-            <span className="block text-[12.5px] font-medium text-ink">打开详细设置</span>
-            <span className="mt-0.5 block text-[11.5px] leading-4 text-ink-3">
-              浏览全部站点的聊天记录，并导出为 JSON / Markdown
-            </span>
-          </span>
-          <span aria-hidden className="text-ink-3">→</span>
-        </button>
-      )}
       <section className="space-y-2.5 rounded-card border border-line bg-surface p-3">
         <h3 className="text-xs font-semibold tracking-wide text-ink-2">模型</h3>
         <div className="space-y-1.5">
@@ -666,19 +651,6 @@ export function SettingsPanel({
       />
 
       <section className="space-y-2.5 rounded-card border border-line bg-surface p-3">
-        <h3 className="text-xs font-semibold tracking-wide text-ink-2">快捷键</h3>
-        <p className="text-[12.5px] leading-5 text-ink-2">
-          <kbd className="rounded-chip bg-inset px-1.5 py-0.5 font-mono text-[11.5px] text-ink">Alt+P</kbd>
-          {' '}
-          显示或隐藏面板。可在
-          {' '}
-          <span className="font-mono text-[11.5px]">chrome://extensions/shortcuts</span>
-          {' '}
-          修改。
-        </p>
-      </section>
-
-      <section className="space-y-2.5 rounded-card border border-line bg-surface p-3">
         <h3 className="text-xs font-semibold tracking-wide text-ink-2">外观</h3>
         <div className="space-y-1.5">
           <Label htmlFor="theme">主题</Label>
@@ -725,8 +697,6 @@ export function SettingsPanel({
       </section>
 
       <p className="text-[11px] leading-5 text-ink-3">
-        密钥保存在本地扩展存储中，关闭浏览器后仍可用。页面内容与截图会发送到你配置的模型服务。CDP
-        会显示浏览器调试提示。验证码、支付、原生权限弹窗无法保证自动化。
         {status && <span className="mt-1 block text-ink-2">{status}</span>}
       </p>
       <Button size="sm" variant="ghost" onClick={() => void patch(DEFAULT_SETTINGS)}>
