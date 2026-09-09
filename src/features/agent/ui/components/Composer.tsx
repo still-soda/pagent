@@ -83,7 +83,7 @@ export function Composer({
   );
 
   return (
-    <div className="mt-auto shrink-0 border-t border-line bg-page p-2">
+    <div className="mt-auto shrink-0 bg-page p-2 pb-3">
       <PromptBar
         demo={false}
         placeholder={placeholder ?? "给当前页面下达任务…"}
