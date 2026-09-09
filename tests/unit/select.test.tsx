@@ -22,7 +22,7 @@ describe('Select toggle and dismissal behavior', () => {
     document.body.removeChild(container);
   });
 
-  it('toggles open and closed when clicking the trigger repeatedly', async () => {
+  it('toggles open and closed across multiple click cycles without flashing or auto-closing', async () => {
     const root = createRoot(container);
     let openState = false;
 
@@ -52,18 +52,44 @@ describe('Select toggle and dismissal behavior', () => {
     expect(trigger).toBeTruthy();
     expect(trigger.getAttribute('data-state')).toBe('closed');
 
-    // First click: opens the select
+    // Cycle 1: Click 1 -> opens and STAYS open (no flash/instant close)
     await act(async () => {
-      trigger.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+      trigger.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'mouse' }));
+    });
+    await act(async () => {
       trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     });
 
     expect(trigger.getAttribute('data-state')).toBe('open');
     expect(openState).toBe(true);
 
-    // Second click on trigger: should toggle CLOSED instead of remaining open!
+    // Cycle 1: Click 2 on trigger -> toggles CLOSED
     await act(async () => {
-      trigger.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+      trigger.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'mouse' }));
+    });
+    await act(async () => {
+      trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    });
+
+    expect(trigger.getAttribute('data-state')).toBe('closed');
+    expect(openState).toBe(false);
+
+    // Cycle 2: Click 3 on trigger -> opens again and STAYS open
+    await act(async () => {
+      trigger.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'mouse' }));
+    });
+    await act(async () => {
+      trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    });
+
+    expect(trigger.getAttribute('data-state')).toBe('open');
+    expect(openState).toBe(true);
+
+    // Cycle 2: Click 4 on trigger -> closes again
+    await act(async () => {
+      trigger.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'mouse' }));
+    });
+    await act(async () => {
       trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     });
 
@@ -99,7 +125,9 @@ describe('Select toggle and dismissal behavior', () => {
 
     // Open it
     await act(async () => {
-      trigger.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+      trigger.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'mouse' }));
+    });
+    await act(async () => {
       trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     });
     expect(trigger.getAttribute('data-state')).toBe('open');
@@ -136,7 +164,9 @@ describe('Select toggle and dismissal behavior', () => {
 
     // Open via pointerdown
     await act(async () => {
-      trigger.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+      trigger.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'mouse' }));
+    });
+    await act(async () => {
       trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     });
     expect(trigger.getAttribute('data-state')).toBe('open');

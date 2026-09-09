@@ -120,7 +120,8 @@ export function SelectTrigger({
 }: ComponentProps<typeof SelectPrimitive.Trigger>) {
   const ctx = useContext(SelectContext);
   const composedRef = composeRefs(ref, ctx?.triggerRef);
-  const suppressClickRef = useRef(false);
+  const openedOnPointerDownRef = useRef(false);
+  const closedOnPointerDownRef = useRef(false);
 
   return (
     <SelectPrimitive.Trigger
@@ -137,18 +138,24 @@ export function SelectTrigger({
         if (event.defaultPrevented) return;
         if (ctx?.open) {
           event.preventDefault();
-          suppressClickRef.current = true;
+          closedOnPointerDownRef.current = true;
+          openedOnPointerDownRef.current = false;
           ctx.setOpen(false);
         } else {
-          suppressClickRef.current = false;
+          closedOnPointerDownRef.current = false;
+          openedOnPointerDownRef.current = true;
         }
       }}
       onClick={(event) => {
         onClick?.(event);
         if (event.defaultPrevented) return;
-        if (suppressClickRef.current) {
+        if (closedOnPointerDownRef.current) {
           event.preventDefault();
-          suppressClickRef.current = false;
+          closedOnPointerDownRef.current = false;
+          return;
+        }
+        if (openedOnPointerDownRef.current) {
+          openedOnPointerDownRef.current = false;
           return;
         }
         if (ctx?.open) {
@@ -161,6 +168,8 @@ export function SelectTrigger({
         if (event.defaultPrevented) return;
         if (ctx?.open && (event.key === 'Enter' || event.key === ' ')) {
           event.preventDefault();
+          closedOnPointerDownRef.current = true;
+          openedOnPointerDownRef.current = false;
           ctx.setOpen(false);
         }
       }}
@@ -182,13 +191,17 @@ export function SelectContent({
   ...props
 }: ComponentProps<typeof SelectPrimitive.Content>) {
   const probeRef = useRef<HTMLSpanElement>(null);
-  const [container, setContainer] = useState<HTMLElement>();
   const ctx = useContext(SelectContext);
+  const [container, setContainer] = useState<HTMLElement | undefined>(() =>
+    resolveShadowPortal(ctx?.triggerRef.current),
+  );
   const composedRef = composeRefs(ref, ctx?.contentRef);
 
   useLayoutEffect(() => {
-    setContainer(resolveShadowPortal(probeRef.current));
-  }, []);
+    if (!container) {
+      setContainer(resolveShadowPortal(probeRef.current ?? ctx?.triggerRef.current));
+    }
+  }, [container, ctx]);
 
   return (
     <>
