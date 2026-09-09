@@ -152,6 +152,7 @@ export default function PromptBar({
   const [draft, setDraft] = useState("");
   const [dismissed, setDismissed] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
+  const [modelOpen, setModelOpen] = useState(false);
   const catalog = models;
   const selectedModel = catalog.find((item) => item.key === modelKey) ?? catalog[0];
   const [mentions, setMentions] = useState<BrowserTab[]>([]);
@@ -365,6 +366,7 @@ export default function PromptBar({
     const step = AUTO_STEPS[autoStep % AUTO_STEPS.length];
     setDraft(step.draft);
     if (step.active !== undefined) setActive(step.active);
+    if (step.modelOpen !== undefined) setModelOpen(step.modelOpen);
     const t = setTimeout(() => setAutoStep((s) => s + 1), step.hold);
     return () => clearTimeout(t);
   }, [auto, autoStep]);
@@ -418,6 +420,7 @@ export default function PromptBar({
 
   const closeMenus = () => {
     setPlusOpen(false);
+    setModelOpen(false);
   };
 
   const pick = (row: MenuRow) => {
@@ -759,6 +762,7 @@ export default function PromptBar({
             aria-expanded={plusOpen}
             onClick={() => {
               setPlusOpen((current) => !current);
+              setModelOpen(false);
               inputRef.current?.focus();
             }}
             className={`flex size-7 shrink-0 items-center justify-center justify-self-start text-ink-3 transition-[background-color,color,transform] duration-150 hover:bg-hover hover:text-ink active:scale-[0.94] ${
@@ -777,6 +781,7 @@ export default function PromptBar({
               setDraft(event.target.value);
               setDismissed(false);
               setPlusOpen(false);
+              setModelOpen(false);
             }}
             onKeyDown={(event) => {
               if (menu && rows.length > 0) {
@@ -815,9 +820,15 @@ export default function PromptBar({
           >
             {catalog.length > 0 && selectedModel && (
               <Select
+                open={modelOpen}
+                onOpenChange={(next) => {
+                  setModelOpen(next);
+                  if (next) setPlusOpen(false);
+                }}
                 value={selectedModel.key}
                 onValueChange={(value) => {
                   onModelChange?.(value);
+                  setModelOpen(false);
                   setPlusOpen(false);
                   celebrate();
                 }}

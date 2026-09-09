@@ -1,27 +1,169 @@
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { IconCheck, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
-import { useLayoutEffect, useRef, useState, type ComponentProps } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ComponentProps,
+  type Ref,
+} from 'react';
 import { resolveShadowPortal } from '@/shared/extension/shadow-portal';
 import { cn } from '@/shared/utils/utils';
 
-export const Select = SelectPrimitive.Root;
+interface SelectContextValue {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
+  contentRef: React.RefObject<HTMLDivElement | null>;
+}
+
+const SelectContext = createContext<SelectContextValue | null>(null);
+
+function composeRefs<T>(...refs: (Ref<T> | undefined)[]) {
+  return (node: T) => {
+    for (const ref of refs) {
+      if (!ref) continue;
+      if (typeof ref === 'function') {
+        ref(node);
+      } else {
+        (ref as React.MutableRefObject<T | null>).current = node;
+      }
+    }
+  };
+}
+
+export function Select({
+  open: openProp,
+  defaultOpen = false,
+  onOpenChange,
+  children,
+  ...props
+}: ComponentProps<typeof SelectPrimitive.Root>) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
+  const isControlled = openProp !== undefined;
+  const open = isControlled ? openProp : uncontrolledOpen;
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+
+  const handleOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!isControlled) {
+        setUncontrolledOpen(nextOpen);
+      }
+      onOpenChange?.(nextOpen);
+    },
+    [isControlled, onOpenChange],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDownCapture = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+
+      const isInsideTrigger =
+        triggerRef.current &&
+        (triggerRef.current === target ||
+          triggerRef.current.contains(target) ||
+          path.includes(triggerRef.current));
+
+      const isInsideContent =
+        contentRef.current &&
+        (contentRef.current === target ||
+          contentRef.current.contains(target) ||
+          path.includes(contentRef.current));
+
+      if (!isInsideTrigger && !isInsideContent) {
+        handleOpenChange(false);
+      }
+    };
+
+    const root = triggerRef.current?.getRootNode() ?? document;
+    root.addEventListener('pointerdown', handlePointerDownCapture as EventListener, true);
+    if (root !== document) {
+      document.addEventListener('pointerdown', handlePointerDownCapture, true);
+    }
+
+    return () => {
+      root.removeEventListener('pointerdown', handlePointerDownCapture as EventListener, true);
+      if (root !== document) {
+        document.removeEventListener('pointerdown', handlePointerDownCapture, true);
+      }
+    };
+  }, [open, handleOpenChange]);
+
+  return (
+    <SelectContext.Provider value={{ open, setOpen: handleOpenChange, triggerRef, contentRef }}>
+      <SelectPrimitive.Root open={open} onOpenChange={handleOpenChange} {...props}>
+        {children}
+      </SelectPrimitive.Root>
+    </SelectContext.Provider>
+  );
+}
+
 export const SelectGroup = SelectPrimitive.Group;
 export const SelectValue = SelectPrimitive.Value;
 
 export function SelectTrigger({
   className,
   children,
+  ref,
+  onPointerDown,
+  onClick,
+  onKeyDown,
   ...props
 }: ComponentProps<typeof SelectPrimitive.Trigger>) {
+  const ctx = useContext(SelectContext);
+  const composedRef = composeRefs(ref, ctx?.triggerRef);
+  const suppressClickRef = useRef(false);
+
   return (
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
+      ref={composedRef}
       className={cn(
         'flex h-8 w-full items-center justify-between gap-2 rounded-md border border-input bg-field px-2.5 text-sm text-ink shadow-xs transition-colors',
         'data-[placeholder]:text-ink-3 focus:outline-none focus-visible:border-line-strong focus-visible:ring-2 focus-visible:ring-ring/40',
         'disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1',
         className,
       )}
+      onPointerDown={(event) => {
+        onPointerDown?.(event);
+        if (event.defaultPrevented) return;
+        if (ctx?.open) {
+          event.preventDefault();
+          suppressClickRef.current = true;
+          ctx.setOpen(false);
+        } else {
+          suppressClickRef.current = false;
+        }
+      }}
+      onClick={(event) => {
+        onClick?.(event);
+        if (event.defaultPrevented) return;
+        if (suppressClickRef.current) {
+          event.preventDefault();
+          suppressClickRef.current = false;
+          return;
+        }
+        if (ctx?.open) {
+          event.preventDefault();
+          ctx.setOpen(false);
+        }
+      }}
+      onKeyDown={(event) => {
+        onKeyDown?.(event);
+        if (event.defaultPrevented) return;
+        if (ctx?.open && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          ctx.setOpen(false);
+        }
+      }}
       {...props}
     >
       {children}
@@ -36,10 +178,13 @@ export function SelectContent({
   className,
   children,
   position = 'popper',
+  ref,
   ...props
 }: ComponentProps<typeof SelectPrimitive.Content>) {
   const probeRef = useRef<HTMLSpanElement>(null);
   const [container, setContainer] = useState<HTMLElement>();
+  const ctx = useContext(SelectContext);
+  const composedRef = composeRefs(ref, ctx?.contentRef);
 
   useLayoutEffect(() => {
     setContainer(resolveShadowPortal(probeRef.current));
@@ -50,6 +195,7 @@ export function SelectContent({
       <span ref={probeRef} className="hidden" aria-hidden />
       <SelectPrimitive.Portal container={container}>
         <SelectPrimitive.Content
+          ref={composedRef}
           data-slot="select-content"
           position={position}
           className={cn(
