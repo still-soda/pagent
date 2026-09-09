@@ -31,6 +31,7 @@ import {
   isTeachingCommentDirectHotkey,
   isTeachingCommentElementHotkey,
 } from '@/shared/extension/hotkey';
+import { BotIcon } from '@/shared/ui/BotIcon';
 
 export function AgentApp({
   open,
@@ -459,14 +460,7 @@ export function AgentApp({
                 <span className="pagent-fab-pulse" aria-hidden />
               </>
             ) : null}
-            <span className="pagent-fab-face">
-              <span className="pagent-fab-eyes" aria-hidden>
-                <span className="pagent-fab-eyes-orbit">
-                  <span className="pagent-fab-eye" />
-                  <span className="pagent-fab-eye" />
-                </span>
-              </span>
-            </span>
+            <BotIcon animated size={56} aria-hidden />
           </button>
         </div>
       </div>

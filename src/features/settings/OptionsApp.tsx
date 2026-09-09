@@ -5,6 +5,7 @@ import { ConversationArchive } from './ConversationArchive';
 import { rpc } from '@/shared/extension/rpc-client';
 import { applyDocumentTheme, resolveThemeClass } from '@/shared/extension/theme';
 import { DEFAULT_SETTINGS, type AgentSettings } from '@/shared/contracts/settings';
+import { BotIcon } from '@/shared/ui/BotIcon';
 
 export type OptionsSection = 'general' | 'archive';
 
@@ -52,14 +53,7 @@ export function OptionsApp() {
       <header className="sticky top-0 z-20 border-b border-line bg-surface/90 backdrop-blur">
         <div className="mx-auto flex h-16 w-full max-w-[1600px] items-center gap-3 px-4 sm:px-6 lg:px-8">
           <span className="pagent-settings-logo" aria-hidden>
-            <span className="pagent-fab-face">
-              <span className="pagent-fab-eyes">
-                <span className="pagent-fab-eyes-orbit">
-                  <span className="pagent-fab-eye" />
-                  <span className="pagent-fab-eye" />
-                </span>
-              </span>
-            </span>
+            <BotIcon size={34} />
           </span>
           <div className="min-w-0">
             <h1 className="text-[15px] font-semibold tracking-[-0.01em]">Pagent 设置</h1>

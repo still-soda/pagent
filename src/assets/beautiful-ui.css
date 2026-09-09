@@ -157,7 +157,7 @@
   --radius-chip: 6px;
   --radius-control: 8px;
   --radius-card: 10px;
-  --radius-window: 14px;
+  --radius-window: 20px;
   --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
@@ -458,6 +458,14 @@
   pointer-events: none;
 }
 
+.pagent-bot-svg {
+  display: block;
+  overflow: visible;
+  user-select: none;
+  pointer-events: none;
+  transition: filter 180ms ease;
+}
+
 .pagent-fab-eyes {
   position: relative;
   z-index: 2;
@@ -465,6 +473,8 @@
   align-items: center;
   gap: 8px;
   perspective: 400px;
+  transform-box: fill-box;
+  transform-origin: center;
   transform: translate(
     calc(var(--fab-look-x) * 5px),
     calc(var(--fab-look-y) * 4px)
@@ -479,6 +489,8 @@
   align-items: center;
   gap: 8px;
   filter: drop-shadow(0 1px 3px oklch(0.19 0.08 270 / 0.38));
+  transform-box: fill-box;
+  transform-origin: center;
   transform: translateZ(22px);
   backface-visibility: hidden;
 }
@@ -489,6 +501,7 @@
   border-radius: 999px;
   background: currentcolor;
   box-shadow: inset 0 -1px 1px oklch(0.7 0.08 260 / 0.22);
+  transform-box: fill-box;
   transform-origin: center;
 }
 
@@ -527,7 +540,8 @@
   animation: pagent-fab-blink 15s ease-in-out infinite;
 }
 
-.pagent-fab:hover .pagent-fab-face {
+.pagent-fab:hover .pagent-fab-face,
+.pagent-fab:hover .pagent-bot-svg {
   filter: saturate(1.08) brightness(1.06);
 }
 
@@ -582,6 +596,10 @@
     inset 0 1px 0 oklch(1 0 0 / 0.25),
     inset 0 -8px 18px oklch(0.25 0.12 270 / 0.15),
     0 0 16px color-mix(in oklch, var(--accent) 28%, transparent);
+}
+
+.pagent-fab.is-working .pagent-bot-svg {
+  filter: drop-shadow(0 0 10px color-mix(in oklch, var(--accent) 55%, transparent));
 }
 
 /* 工作结束庆祝：球体保持不动，眼睛沿球面绕行一周 —— 从正面滑向侧面，

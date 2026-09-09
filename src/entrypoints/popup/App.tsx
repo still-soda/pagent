@@ -4,6 +4,7 @@ import { applyDocumentTheme, resolveThemeClass } from '@/shared/extension/theme'
 import type { AgentSettings } from '@/shared/contracts/settings';
 import { Button } from '@/shared/ui/beui/button';
 import { Switch } from '@/shared/ui/beui/switch';
+import { BotIcon } from '@/shared/ui/BotIcon';
 
 export function PopupApp() {
   const [settings, setSettings] = useState<AgentSettings>();
@@ -50,14 +51,7 @@ export function PopupApp() {
       <section>
         <header className="flex items-center gap-3 border-b border-line px-4 py-3.5">
           <span className="pagent-settings-logo" aria-hidden>
-            <span className="pagent-fab-face">
-              <span className="pagent-fab-eyes">
-                <span className="pagent-fab-eyes-orbit">
-                  <span className="pagent-fab-eye" />
-                  <span className="pagent-fab-eye" />
-                </span>
-              </span>
-            </span>
+            <BotIcon size={34} />
           </span>
           <div className="min-w-0 flex-1">
             <h1 className="text-[14px] font-semibold tracking-[-0.01em]">Pagent</h1>
