@@ -44,7 +44,12 @@ function closeTask() {
     </el-main>
   </el-container>
 
-  <SceneTaskPanel v-if="taskVisible" :steps="current.task" @close="closeTask" />
+  <SceneTaskPanel
+    v-if="taskVisible"
+    :steps="current.task"
+    :prompt="current.prompt"
+    @close="closeTask"
+  />
 
   <el-drawer
     v-model="menuOpen"
