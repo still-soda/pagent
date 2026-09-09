@@ -34,6 +34,7 @@ export function handleContentCommand(name: string, payload: Record<string, unkno
   switch (name) {
     case 'ui.toggle':
     case 'ui.open':
+    case 'ui.collapse':
     case 'ui.hide':
     case 'ui.capture.start':
     case 'ui.capture.end':

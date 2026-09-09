@@ -87,8 +87,20 @@ export function useAgentEventConsumer(options: {
       sessionId?: string;
       conversationId?: string;
       store?: PageConversationStore;
+      working?: boolean;
+      agentActive?: boolean;
     }) => {
-      if (message.channel !== CHANNEL || message.kind !== 'agent-event' || !message.event) return;
+      if (message.channel !== CHANNEL) return;
+      if (message.kind === 'agent-retarget') {
+        flushPendingStream();
+        if (message.working === false) {
+          runningIdRef.current = null;
+          setWorkingOnThisPage(false);
+          setAgentActive(Boolean(message.agentActive));
+        }
+        return;
+      }
+      if (message.kind !== 'agent-event' || !message.event) return;
       const event = message.event;
       const targetId = runningIdRef.current;
       if ((event.type === 'token' || event.type === 'reasoning') && targetId) {

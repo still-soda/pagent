@@ -123,6 +123,15 @@ export function AgentApp({
     if (session.agentActive && !session.workingOnThisPage) onOpenChange(false);
   }, [session.agentActive, session.workingOnThisPage, onOpenChange]);
 
+  const prevWorkingOnThisPage = useRef(false);
+  useLayoutEffect(() => {
+    const wasWorking = prevWorkingOnThisPage.current;
+    prevWorkingOnThisPage.current = session.workingOnThisPage;
+    if (!wasWorking && session.workingOnThisPage) {
+      onOpenChange(true);
+    }
+  }, [session.workingOnThisPage, onOpenChange]);
+
   useEffect(() => {
     const fab = fabRef.current;
     if (open || session.agentActive) {

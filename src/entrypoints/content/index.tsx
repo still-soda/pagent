@@ -70,6 +70,9 @@ function ContentShell() {
       setVisible(true);
       setOpenAndPersist(true);
     };
+    const onCollapse = () => {
+      setOpenAndPersist(false);
+    };
     const onHide = () => {
       setOpenAndPersist(false);
       setVisible(false);
@@ -95,6 +98,7 @@ function ContentShell() {
     const shadowRoot = document.querySelector('pagent-root')?.shadowRoot;
     uiEvents.addEventListener('toggle', onToggle);
     uiEvents.addEventListener('open', onOpen);
+    uiEvents.addEventListener('collapse', onCollapse);
     uiEvents.addEventListener('hide', onHide);
     window.addEventListener('keydown', onKeyDown, true);
     shadowRoot?.addEventListener('keydown', onKeyDown, true);
@@ -105,6 +109,7 @@ function ContentShell() {
     return () => {
       uiEvents.removeEventListener('toggle', onToggle);
       uiEvents.removeEventListener('open', onOpen);
+      uiEvents.removeEventListener('collapse', onCollapse);
       uiEvents.removeEventListener('hide', onHide);
       window.removeEventListener('keydown', onKeyDown, true);
       shadowRoot?.removeEventListener('keydown', onKeyDown, true);

@@ -7,12 +7,12 @@ import {
 } from '@/features/agent/session/conversations';
 import { adoptLiveStore, applyAgentEventToStore, nextStoreRevision } from '@/features/agent/session/session-live';
 import { conversationVaultKey } from '@/features/agent/session/vault';
-import { loadSettings } from '@/shared/storage/storage';
+import { loadSettings, saveTabUi } from '@/shared/storage/storage';
 import type { AgentEvent } from '@/shared/contracts/agent';
 import type { ChatMessage, PageConversationStore, UserBadge, UserReference } from '@/shared/contracts/session';
 import { nowId } from '@/shared/utils/utils';
 import { beginBusyKeepAlive, endBusyKeepAlive } from '@/shared/extension/keepalive';
-import { createBridge, ensureContentScript } from './content-bridge';
+import { createBridge, ensureContentScript, sendToContent } from './content-bridge';
 import {
   queueTabStoreWrite,
   readTabStore,
@@ -59,16 +59,42 @@ export async function retargetAgent(fromTabId: number, toTabId: number): Promise
   running.delete(fromTabId);
   control.tabId = toTabId;
   running.set(toTabId, control);
+
+  if (live) {
+    live.panelOpen = false;
+  }
+  void saveTabUi(fromTabId, { panelOpen: false }).catch(() => {});
+  void sendToContent(fromTabId, 'ui.collapse', {}).catch(() => {});
+  browser.tabs.sendMessage(fromTabId, {
+    channel: CHANNEL,
+    kind: 'agent-retarget',
+    working: false,
+    agentActive: running.size > 0,
+  }).catch(() => {});
+
   if (live) {
     control.store = {
       ...adoptLiveStore(tabStores.get(toTabId), control.store, control.conversationId),
+      panelOpen: true,
       sessionId: control.sessionId,
       revision: nextStoreRevision(tabStores.get(toTabId)),
     };
     await writeTabStore(toTabId, control.store);
   }
+  void saveTabUi(toTabId, { panelOpen: true }).catch(() => {});
+
   try {
     await ensureContentScript(toTabId);
+    void sendToContent(toTabId, 'ui.open', {}).catch(() => {});
+    browser.tabs.sendMessage(toTabId, {
+      channel: CHANNEL,
+      kind: 'agent-event',
+      event: { type: 'status', message: 'Agent 已就绪' },
+      sessionId: control.sessionId,
+      revision: control.store.revision ?? 0,
+      conversationId: control.conversationId,
+      store: control.store,
+    }).catch(() => {});
   } catch {
     // protected destination
   }
