@@ -3,6 +3,8 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import Chart from 'chart.js/auto'
 import type { Chart as ChartInstance } from 'chart.js'
+import { useSceneOracle } from '../oracle'
+import { verifyChart } from './chart-verify'
 
 type Category = '数码' | '服饰' | '食品' | '家居'
 
@@ -248,6 +250,11 @@ function resetFilters() {
   filters.product = ''
   keyword.value = ''
 }
+
+useSceneOracle('chart', {
+  verify: verifyChart,
+  reset: resetFilters,
+})
 </script>
 
 <template>

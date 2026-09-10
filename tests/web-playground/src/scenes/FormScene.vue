@@ -3,6 +3,8 @@ import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { Iphone, Message, User } from '@element-plus/icons-vue'
+import { useSceneOracle } from '../oracle'
+import { verifyForm } from './form-verify'
 
 interface SignupForm {
   name: string
@@ -104,6 +106,11 @@ function resetForm() {
   formRef.value?.resetFields()
   submitted.value = null
 }
+
+useSceneOracle('form', {
+  verify: () => verifyForm({ submitted: submitted.value }),
+  reset: resetForm,
+})
 </script>
 
 <template>

@@ -1,5 +1,5 @@
 import type { Component } from 'vue'
-import type { RouteRecordRaw } from 'vue-router'
+import type { RouteComponent, RouteRecordRaw } from 'vue-router'
 import {
   Cpu,
   EditPen,
@@ -10,15 +10,6 @@ import {
   TrendCharts,
   WarnTriangleFilled,
 } from '@element-plus/icons-vue'
-import ChartScene from './ChartScene.vue'
-import FormScene from './FormScene.vue'
-import PreferenceScene from './PreferenceScene.vue'
-import DevOpsScene from './devops/DevOpsScene.vue'
-import KanbanScene from './kanban/KanbanScene.vue'
-import ReconcileScene from './reconcile/ReconcileScene.vue'
-import BankStatementSubpage from './reconcile/BankStatementSubpage.vue'
-import AuditSafetyScene from './audit-safety/AuditSafetyScene.vue'
-import BiBuilderScene from './bi-builder/BiBuilderScene.vue'
 import { knowledgeBaseScene } from './knowledge-base'
 
 export interface PlaygroundScene {
@@ -30,7 +21,7 @@ export interface PlaygroundScene {
   /** 详细验证与评测验收参考要点 */
   task: string[]
   icon: Component
-  component: Component
+  component: RouteComponent
   /** 自定义完整路由（含子路由）；未提供时按 `/{id}` 生成单页路由 */
   routes?: RouteRecordRaw[]
 }
@@ -53,7 +44,7 @@ export const scenes: PlaygroundScene[] = [
       '保存以上设置。',
     ],
     icon: Setting,
-    component: PreferenceScene,
+    component: () => import('./PreferenceScene.vue'),
   },
   {
     id: 'form',
@@ -71,7 +62,7 @@ export const scenes: PlaygroundScene[] = [
       '提交报名并核对结果。',
     ],
     icon: EditPen,
-    component: FormScene,
+    component: () => import('./FormScene.vue'),
   },
   {
     id: 'chart',
@@ -87,7 +78,7 @@ export const scenes: PlaygroundScene[] = [
       '输出简短的分析结论。',
     ],
     icon: TrendCharts,
-    component: ChartScene,
+    component: () => import('./ChartScene.vue'),
   },
   knowledgeBaseScene,
   {
@@ -105,7 +96,7 @@ export const scenes: PlaygroundScene[] = [
       '切换至「网关与流量控制」Tab，将灰度流量切分权重调整至 100% 并应用网关规则。',
     ],
     icon: Cpu,
-    component: DevOpsScene,
+    component: () => import('./devops/DevOpsScene.vue'),
   },
   {
     id: 'kanban',
@@ -121,7 +112,7 @@ export const scenes: PlaygroundScene[] = [
       '使用顶部筛选器将责任人筛选为「林工」，核对该卡片流转状态。',
     ],
     icon: Grid,
-    component: KanbanScene,
+    component: () => import('./kanban/KanbanScene.vue'),
   },
   {
     id: 'reconcile',
@@ -136,18 +127,18 @@ export const scenes: PlaygroundScene[] = [
       '完成第 1 页全部 6 笔单据核对后，点击「提交当页核销结果」。',
     ],
     icon: Money,
-    component: ReconcileScene,
+    component: () => import('./reconcile/ReconcileScene.vue'),
     routes: [
       {
         path: '/reconcile',
         name: 'reconcile',
-        component: ReconcileScene,
+        component: () => import('./reconcile/ReconcileScene.vue'),
         meta: { sceneId: 'reconcile' },
       },
       {
         path: '/reconcile/statement',
         name: 'reconcile-statement',
-        component: BankStatementSubpage,
+        component: () => import('./reconcile/BankStatementSubpage.vue'),
         meta: { sceneId: 'reconcile' },
       },
     ],
@@ -165,7 +156,7 @@ export const scenes: PlaygroundScene[] = [
       '进入「平台官方仲裁与判决」Tab，选择「折旧部分退款」，金额填入 1580 元，填写核验依据并提交最终仲裁决议。',
     ],
     icon: WarnTriangleFilled,
-    component: AuditSafetyScene,
+    component: () => import('./audit-safety/AuditSafetyScene.vue'),
   },
   {
     id: 'bi-builder',
@@ -174,13 +165,13 @@ export const scenes: PlaygroundScene[] = [
     prompt:
       '在数据透视台帮我抓一下自营高客单价（500以上）的异常商家。重点看退货率偏高（超10%）或者客诉多的情况，把这批商家的品类透视表跑出来，挑退货率最高的那个品类把明细导出来看下具体是哪些 SKU 在出问题。',
     task: [
-      '在顶层条件组中保持 AND 关系，确认基础条件：销售渠道 = 线上自营 且 平均客单价 > 500。',
+      '在顶层条件组中保持 AND 关系，添加基础条件：销售渠道 = 线上自营 且 平均客单价 > 500。',
       '点击「+ 添加嵌套条件组 (Group)」，将该子组组合关系切换为 OR。',
       '在子组中配置两个分支条件：退货率 > 10% 或 客诉次数 >= 3。',
       '点击右上角「执行多维透视计算」，在下方品类透视矩阵表格中查看聚合运算结果。',
       '在退货率最高的主营品类行点击「展开异常明细」，查看受损商家 SKU 明细并点击「导出异常明细报表」。',
     ],
     icon: Histogram,
-    component: BiBuilderScene,
+    component: () => import('./bi-builder/BiBuilderScene.vue'),
   },
 ]

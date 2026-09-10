@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Expand } from '@element-plus/icons-vue'
 import SceneTaskPanel from './components/SceneTaskPanel.vue'
+import SceneVerifyDock from './components/SceneVerifyDock.vue'
 import { scenes } from './scenes'
 
 const route = useRoute()
@@ -13,9 +14,24 @@ const current = computed(
     scenes.find((scene) => scene.id === route.meta.sceneId) ?? scenes[0],
 )
 
+const flushScenes = new Set([
+  'devops',
+  'kanban',
+  'reconcile',
+  'audit-safety',
+  'bi-builder',
+])
+const isStatement = computed(() => route.name === 'reconcile-statement')
+const isFlush = computed(
+  () => isStatement.value || flushScenes.has(String(current.value.id)),
+)
+
 const closedTasks = ref<Record<string, boolean>>({})
 const taskVisible = computed(
-  () => current.value.task.length > 0 && !closedTasks.value[current.value.id],
+  () =>
+    !isStatement.value &&
+    current.value.task.length > 0 &&
+    !closedTasks.value[current.value.id],
 )
 
 function onSelect(id: string) {
@@ -30,7 +46,7 @@ function closeTask() {
 
 <template>
   <el-container class="app-shell">
-    <el-header class="header" height="auto">
+    <el-header v-if="!isStatement" class="header" height="auto">
       <button type="button" class="menu-trigger" aria-label="打开菜单" @click="menuOpen = true">
         <el-icon :size="18"><Expand /></el-icon>
       </button>
@@ -39,7 +55,7 @@ function closeTask() {
         <p>{{ current.description }}</p>
       </div>
     </el-header>
-    <el-main class="main">
+    <el-main class="main" :class="{ 'is-flush': isFlush }">
       <router-view />
     </el-main>
   </el-container>
@@ -54,7 +70,7 @@ function closeTask() {
   <el-drawer
     v-model="menuOpen"
     direction="ltr"
-    size="232px"
+    size="280px"
     :with-header="false"
     class="nav-drawer"
   >
@@ -70,6 +86,7 @@ function closeTask() {
         <span>{{ scene.title }}</span>
       </el-menu-item>
     </el-menu>
+    <SceneVerifyDock :scene-id="current.id" />
   </el-drawer>
 </template>
 
@@ -130,6 +147,19 @@ function closeTask() {
 .main {
   background: var(--el-fill-color-light);
 }
+
+.main.is-flush {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+
+.main.is-flush > * {
+  flex: 1;
+  min-height: 0;
+}
 </style>
 
 <style>
@@ -159,5 +189,7 @@ function closeTask() {
 .nav-drawer .scene-menu {
   border-right: none;
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 </style>

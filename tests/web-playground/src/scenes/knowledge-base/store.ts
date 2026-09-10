@@ -20,6 +20,8 @@ function persist() {
 
 const docs = ref<SavedDoc[]>(load())
 
+const resetEpoch = ref(0)
+
 export function useDocsStore() {
   function save(doc: SavedDoc) {
     const index = docs.value.findIndex((item) => item.id === doc.id)
@@ -40,5 +42,11 @@ export function useDocsStore() {
     return docs.value.find((item) => item.id === id)
   }
 
-  return { docs, save, remove, get }
+  function clearAll() {
+    docs.value = []
+    persist()
+    resetEpoch.value += 1
+  }
+
+  return { docs, save, remove, get, clearAll, resetEpoch }
 }

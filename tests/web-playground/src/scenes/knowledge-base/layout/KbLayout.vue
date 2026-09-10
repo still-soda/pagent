@@ -2,7 +2,10 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Reading } from '@element-plus/icons-vue'
+import { useSceneOracle } from '../../../oracle'
 import { articles, categories } from '../data'
+import { useDocsStore } from '../store'
+import { verifyKnowledgeBase } from '../verify'
 
 const route = useRoute()
 const router = useRouter()
@@ -24,6 +27,13 @@ function countOf(key: string): number {
 function goCategory(key: string) {
   router.push(key === 'all' ? '/knowledge-base' : { path: '/knowledge-base', query: { category: key } })
 }
+
+const docsStore = useDocsStore()
+
+useSceneOracle('knowledge-base', {
+  verify: () => verifyKnowledgeBase({ docs: docsStore.docs.value }),
+  reset: () => docsStore.clearAll(),
+})
 </script>
 
 <template>

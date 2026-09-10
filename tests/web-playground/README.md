@@ -24,6 +24,26 @@ pnpm dev
 
 默认打开 [http://localhost:5173](http://localhost:5173)。
 
+判定函数的单元测试：
+
+```bash
+pnpm --dir tests/web-playground test
+```
+
+## 任务判定
+
+任务提示（自然指令 + 验收步骤）是阅后即焚：复制发给 Agent 后关掉即可，避免 Agent 看到答案。判定入口藏在左上角菜单抽屉底部：打开「星澜工作台」侧栏，用 **验证完成情况** / **重置场景**。判定只看页面终态，分条给出通过 / 失败 / 无法判定。不要让 Agent 去点这两个按钮。
+
+脚本入口（当前页）：
+
+```js
+window.__pagentOracle.getSceneId()
+window.__pagentOracle.verify()
+window.__pagentOracle.reset()
+```
+
+数据看板几乎全是口头结论，验证结果会标成无法判定。知识库写作用标题、标签和正文关键词做启发式检查。
+
 ## 页面
 
 - **偏好设置**（`preferences`）：隐蔽交互集合，用于检验变化观察工具的覆盖能力。

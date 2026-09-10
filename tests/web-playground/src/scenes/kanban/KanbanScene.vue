@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useSceneOracle } from '../../oracle'
+import { verifyKanban } from './verify'
 import {
   Connection,
   Plus,
   Search,
-  User,
 } from '@element-plus/icons-vue'
 import { initialKanbanColumns } from './data'
 import type { KanbanCard, KanbanColumn, PriorityType } from './types'
@@ -129,86 +130,98 @@ function priorityType(p: PriorityType): 'danger' | 'warning' | 'primary' | 'info
   if (p.includes('P2')) return 'primary'
   return 'info'
 }
+
+const assigneeTone: Record<string, string> = {
+  林工: '#2563eb',
+  王工: '#059669',
+  陈工: '#d97706',
+  张工: '#7c3aed',
+  李工: '#db2777',
+}
+
+function laneTone(id: KanbanColumn['id']) {
+  if (id === 'in_progress') return 'blue'
+  if (id === 'testing') return 'violet'
+  if (id === 'acceptance') return 'amber'
+  if (id === 'released') return 'green'
+  return 'slate'
+}
+
+function resetKanban() {
+  columns.splice(0, columns.length, ...JSON.parse(JSON.stringify(initialKanbanColumns)))
+  filterAssignee.value = ''
+  filterPriority.value = ''
+  filterEpic.value = ''
+  searchQuery.value = ''
+  drawerOpen.value = false
+  activeCard.value = null
+  newDepInput.value = ''
+}
+
+useSceneOracle('kanban', {
+  verify: () =>
+    verifyKanban({
+      columns,
+      filterAssignee: filterAssignee.value,
+    }),
+  reset: resetKanban,
+})
 </script>
 
 <template>
   <div class="kanban-workbench">
-    <!-- 顶部控制与多维筛选工具栏 -->
-    <header class="kanban-header">
-      <div class="header-left">
-        <span class="board-title">星澜敏捷协同 · 2026 Q3 核心版本迭代看板</span>
-        <span class="total-cards">全盘任务：{{ columns.reduce((acc, c) => acc + c.cards.length, 0) }} 项</span>
+    <header class="board-bar">
+      <div class="board-id">
+        <span class="board-name">支付结算</span>
+        <span class="sprint">Sprint 24</span>
+        <span class="count">{{ columns.reduce((acc, c) => acc + c.cards.length, 0) }} 项</span>
       </div>
-
       <div class="filter-controls">
-        <el-select
-          v-model="filterAssignee"
-          placeholder="全部责任人"
-          clearable
-          style="width: 130px"
-          size="small"
-        >
+        <el-select v-model="filterAssignee" placeholder="全部责任人" clearable style="width: 120px" size="small">
           <el-option label="林工" value="林工" />
           <el-option label="王工" value="王工" />
           <el-option label="陈工" value="陈工" />
           <el-option label="张工" value="张工" />
           <el-option label="李工" value="李工" />
         </el-select>
-
-        <el-select
-          v-model="filterPriority"
-          placeholder="全部优先级"
-          clearable
-          style="width: 130px"
-          size="small"
-        >
+        <el-select v-model="filterPriority" placeholder="全部优先级" clearable style="width: 120px" size="small">
           <el-option label="P0-紧急" value="P0-紧急" />
           <el-option label="P1-高" value="P1-高" />
           <el-option label="P2-中" value="P2-中" />
           <el-option label="P3-低" value="P3-低" />
         </el-select>
-
-        <el-select
-          v-model="filterEpic"
-          placeholder="全部业务史诗"
-          clearable
-          style="width: 140px"
-          size="small"
-        >
+        <el-select v-model="filterEpic" placeholder="全部业务史诗" clearable style="width: 130px" size="small">
           <el-option label="核心改造" value="核心改造" />
           <el-option label="用户体验" value="用户体验" />
           <el-option label="基础设施" value="基础设施" />
           <el-option label="国际化出海" value="国际化出海" />
         </el-select>
-
         <el-input
           v-model="searchQuery"
           placeholder="搜索任务标题或编号..."
           :prefix-icon="Search"
           clearable
-          style="width: 210px"
+          style="width: 200px"
           size="small"
         />
       </div>
     </header>
 
-    <!-- 横向超宽泳道视口 -->
     <main class="board-viewport">
       <div class="board-lane-track">
         <div
           v-for="col in columns"
           :key="col.id"
           class="swimlane-column"
-          :class="{ 'swimlane-dragover': dragOverColumnId === col.id }"
+          :class="[laneTone(col.id), { 'is-over': dragOverColumnId === col.id }]"
           @dragover="onDragOver($event, col.id)"
           @dragleave="onDragLeave(col.id)"
           @drop="onDrop($event, col.id)"
         >
           <div class="lane-header">
-            <div class="lane-title-box">
-              <span class="lane-name">{{ col.title }}</span>
-              <span class="lane-counter">{{ filterCards(col.cards).length }}</span>
-            </div>
+            <span class="lane-dot" />
+            <span class="lane-name">{{ col.title }}</span>
+            <span class="lane-counter">{{ filterCards(col.cards).length }}</span>
           </div>
 
           <div class="cards-stream">
@@ -217,54 +230,39 @@ function priorityType(p: PriorityType): 'danger' | 'warning' | 'primary' | 'info
               :key="card.id"
               :id="`card-${card.id}`"
               class="task-card"
-              :class="{ 'card-ghost': draggedCard?.id === card.id }"
+              :class="[{ ghost: draggedCard?.id === card.id }, card.priority.slice(0, 2).toLowerCase()]"
               draggable="true"
               @dragstart="onDragStart($event, card, col.id)"
             >
-              <div class="card-meta-top">
+              <div class="card-top">
                 <span class="card-code">{{ card.id }}</span>
-                <el-tag :type="priorityType(card.priority)" size="small" effect="plain">
-                  {{ card.priority }}
-                </el-tag>
+                <span class="prio">{{ card.priority }}</span>
               </div>
-
-              <div class="card-title-text" @click="openCardDrawer(card)">
+              <button type="button" class="card-title-text" @click="openCardDrawer(card)">
                 {{ card.title }}
-              </div>
-
-              <div v-if="card.dependencies.length > 0" class="card-dep-badge">
+              </button>
+              <div v-if="card.dependencies.length" class="dep">
                 <el-icon :size="12"><Connection /></el-icon>
-                <span>依赖: {{ card.dependencies.join(', ') }}</span>
+                {{ card.dependencies.join(', ') }}
               </div>
-
-              <div class="card-meta-middle">
-                <span class="epic-badge">{{ card.epic }}</span>
-                <span class="sp-pill">{{ card.storyPoints }} SP</span>
+              <div class="card-mid">
+                <span class="epic">{{ card.epic }}</span>
+                <span class="sp">{{ card.storyPoints }}</span>
               </div>
-
-              <div class="subtask-progress-box">
-                <span class="subtask-ratio">子任务 {{ card.completedSubtasks }}/{{ card.totalSubtasks }}</span>
-                <el-progress
-                  :percentage="Math.round((card.completedSubtasks / card.totalSubtasks) * 100)"
-                  :stroke-width="4"
-                  :show-text="false"
-                />
+              <div class="subtasks">
+                <span>{{ card.completedSubtasks }}/{{ card.totalSubtasks }}</span>
+                <i><b :style="{ width: Math.round((card.completedSubtasks / card.totalSubtasks) * 100) + '%' }" /></i>
               </div>
-
-              <div class="card-footer-row">
-                <div class="tags-cluster">
-                  <span v-for="tag in card.tags" :key="tag" class="chip">{{ tag }}</span>
+              <div class="card-foot">
+                <div class="tags">
+                  <span v-for="tag in card.tags" :key="tag">{{ tag }}</span>
                 </div>
-                <div class="assignee-box">
-                  <el-icon :size="12"><User /></el-icon>
-                  <span>{{ card.assignee }}</span>
-                </div>
+                <span class="avatar" :style="{ background: assigneeTone[card.assignee] || '#64748b' }">
+                  {{ card.assignee.slice(0, 1) }}
+                </span>
               </div>
-
-              <div class="card-hover-actions">
-                <el-button size="small" link type="primary" @click.stop="openCardDrawer(card)">
-                  配置详情
-                </el-button>
+              <div class="card-actions">
+                <el-button size="small" link type="primary" @click.stop="openCardDrawer(card)">配置详情</el-button>
                 <el-button
                   v-if="col.id !== 'acceptance'"
                   size="small"
@@ -276,87 +274,53 @@ function priorityType(p: PriorityType): 'danger' | 'warning' | 'primary' | 'info
                 </el-button>
               </div>
             </div>
-
-            <div v-if="filterCards(col.cards).length === 0" class="empty-lane">
-              暂无符合条件的任务卡片
-            </div>
+            <div v-if="filterCards(col.cards).length === 0" class="empty-lane">没有匹配的卡片</div>
           </div>
         </div>
       </div>
     </main>
 
     <!-- 卡片详情与前置依赖配置抽屉 -->
-    <el-drawer
-      v-model="drawerOpen"
-      :title="`任务工单详情 · ${activeCard?.id}`"
-      size="520px"
-      direction="rtl"
-    >
-      <div v-if="activeCard" class="card-drawer-content">
-        <div class="drawer-header-block">
-          <h3>{{ activeCard.title }}</h3>
-          <p class="drawer-desc">{{ activeCard.description }}</p>
-        </div>
+    <el-drawer v-model="drawerOpen" :title="activeCard?.id" size="480px" direction="rtl">
+      <div v-if="activeCard" class="drawer-body">
+        <h3>{{ activeCard.title }}</h3>
+        <p class="drawer-desc">{{ activeCard.description }}</p>
 
-        <el-descriptions :column="2" border size="small">
-          <el-descriptions-item label="任务编号">{{ activeCard.id }}</el-descriptions-item>
-          <el-descriptions-item label="所属史诗">{{ activeCard.epic }}</el-descriptions-item>
-          <el-descriptions-item label="责任研发">{{ activeCard.assignee }}</el-descriptions-item>
-          <el-descriptions-item label="优先级">
-            <el-tag :type="priorityType(activeCard.priority)" size="small">
-              {{ activeCard.priority }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="故事点估算">{{ activeCard.storyPoints }} SP</el-descriptions-item>
-          <el-descriptions-item label="子任务进度">
-            {{ activeCard.completedSubtasks }} / {{ activeCard.totalSubtasks }} 完成
-          </el-descriptions-item>
-        </el-descriptions>
+        <dl class="meta-grid">
+          <div><dt>经办人</dt><dd>{{ activeCard.assignee }}</dd></div>
+          <div><dt>史诗</dt><dd>{{ activeCard.epic }}</dd></div>
+          <div>
+            <dt>优先级</dt>
+            <dd><el-tag :type="priorityType(activeCard.priority)" size="small">{{ activeCard.priority }}</el-tag></dd>
+          </div>
+          <div><dt>故事点</dt><dd>{{ activeCard.storyPoints }}</dd></div>
+          <div>
+            <dt>子任务</dt>
+            <dd>{{ activeCard.completedSubtasks }}/{{ activeCard.totalSubtasks }}</dd>
+          </div>
+        </dl>
 
-        <!-- 前置依赖链路 -->
         <div class="dep-section">
-          <div class="dep-top">
-            <h4>前置阻塞依赖 (Blocker Dependencies)</h4>
-            <span class="dep-tip">该任务必须等待前置依赖全部在主干部署后方可发起验收</span>
+          <h4>阻塞依赖</h4>
+          <p class="dep-tip">验收前需这些项先合入主干</p>
+          <div v-if="activeCard.dependencies.length === 0" class="no-dep">暂无依赖</div>
+          <div v-for="dep in activeCard.dependencies" :key="dep" class="dep-row">
+            <el-icon :size="14"><Connection /></el-icon>
+            <span>{{ dep }}</span>
+            <el-button type="danger" link size="small" @click="removeDependency(dep)">移除</el-button>
           </div>
-
-          <div class="dep-container">
-            <div v-if="activeCard.dependencies.length === 0" class="no-dep-tip">
-              当前无前置阻塞依赖
-            </div>
-            <div
-              v-for="dep in activeCard.dependencies"
-              :key="dep"
-              class="dep-item-box"
-            >
-              <el-icon :size="14"><Connection /></el-icon>
-              <span class="dep-title">{{ dep }}</span>
-              <el-button type="danger" link size="small" @click="removeDependency(dep)">
-                移除
-              </el-button>
-            </div>
-          </div>
-
-          <div class="dep-add-bar">
+          <div class="dep-add">
             <el-input
               v-model="newDepInput"
               placeholder="输入或选择前置依赖，如：基础支付服务 v2.4.0"
               size="small"
-              style="flex: 1"
             />
-            <el-button
-              id="btn-add-dep"
-              type="primary"
-              size="small"
-              :icon="Plus"
-              @click="addDependency"
-            >
+            <el-button id="btn-add-dep" type="primary" size="small" :icon="Plus" @click="addDependency">
               添加依赖
             </el-button>
           </div>
         </div>
-
-        <div class="drawer-action-row">
+        <div class="drawer-foot">
           <el-button type="primary" @click="drawerOpen = false">保存并关闭</el-button>
         </div>
       </div>
@@ -368,314 +332,312 @@ function priorityType(p: PriorityType): 'danger' | 'warning' | 'primary' | 'info
 .kanban-workbench {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 120px);
-  padding: 16px;
-  gap: 14px;
+  height: 100%;
+  background: #ebecf0;
 }
 
-.kanban-header {
+.board-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 12px 18px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 10px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  min-height: 48px;
+  padding: 8px 16px;
+  background: #fff;
+  border-bottom: 1px solid #dfe1e6;
 }
 
-.header-left {
+.board-id {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
-.board-title {
-  font-size: 15px;
+.board-name {
+  font-size: 14px;
   font-weight: 600;
-  color: var(--el-text-color-primary);
 }
 
-.total-cards {
+.sprint,
+.count {
   font-size: 12px;
-  color: var(--el-text-color-secondary);
+  color: #6b778c;
+  padding: 1px 7px;
+  background: #f4f5f7;
+  border-radius: 3px;
 }
 
 .filter-controls {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
-/* 横向泳道滚动视口 */
 .board-viewport {
   flex: 1;
   overflow-x: auto;
   overflow-y: hidden;
-  padding-bottom: 6px;
 }
 
 .board-lane-track {
   display: flex;
-  gap: 14px;
-  min-width: 1600px;
+  gap: 8px;
+  min-width: 1480px;
   height: 100%;
+  padding: 12px;
 }
 
 .swimlane-column {
   flex: 1;
-  width: 300px;
-  background: var(--el-fill-color-light);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 10px;
+  min-width: 270px;
   display: flex;
   flex-direction: column;
-  padding: 12px;
-  transition: background-color 0.15s, border-color 0.15s;
+  background: #f4f5f7;
+  border-radius: 3px;
 }
 
-.swimlane-dragover {
-  background: var(--el-color-primary-light-9);
-  border-color: var(--el-color-primary);
+.swimlane-column.is-over {
+  background: #e9f2ff;
 }
 
 .lane-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  gap: 8px;
+  padding: 10px 10px 8px;
 }
 
-.lane-title-box {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.lane-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #97a0af;
 }
+
+.swimlane-column.blue .lane-dot { background: #0052cc; }
+.swimlane-column.violet .lane-dot { background: #6554c0; }
+.swimlane-column.amber .lane-dot { background: #ff8b00; }
+.swimlane-column.green .lane-dot { background: #00875a; }
 
 .lane-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #5e6c84;
 }
 
 .lane-counter {
+  margin-left: auto;
   font-size: 11px;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 8px;
-  background: var(--el-fill-color);
-  color: var(--el-text-color-secondary);
+  color: #6b778c;
 }
 
 .cards-stream {
   flex: 1;
   overflow-y: auto;
-  padding-top: 10px;
+  padding: 0 8px 8px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .task-card {
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
-  padding: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  position: relative;
+  padding: 8px 10px 8px 12px;
+  background: #fff;
+  border-radius: 3px;
+  box-shadow: 0 1px 1px rgba(9, 30, 66, 0.13);
   cursor: grab;
-  transition: transform 0.15s, box-shadow 0.15s;
+  border-left: 3px solid #dfe1e6;
 }
 
-.task-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
-}
+.task-card.p0 { border-left-color: #de350b; }
+.task-card.p1 { border-left-color: #ff8b00; }
+.task-card.p2 { border-left-color: #0052cc; }
+.task-card.p3 { border-left-color: #97a0af; }
+.task-card.ghost { opacity: 0.45; }
 
-.card-ghost {
-  opacity: 0.4;
-  border-style: dashed;
-  border-color: var(--el-color-primary);
-}
-
-.card-meta-top {
+.card-top {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  margin-bottom: 6px;
+  font-size: 11px;
+  color: #6b778c;
 }
 
 .card-code {
-  font-family: monospace;
-  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.prio {
   font-weight: 600;
-  color: var(--el-text-color-secondary);
 }
 
 .card-title-text {
+  display: block;
+  width: 100%;
+  margin: 6px 0 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
   font-size: 13px;
   font-weight: 600;
-  color: var(--el-text-color-primary);
   line-height: 1.4;
-  margin-bottom: 6px;
+  color: #172b4d;
+  cursor: pointer;
 }
 
-.card-dep-badge {
+.dep {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
-  color: var(--el-color-warning);
   margin-bottom: 6px;
-  padding: 2px 6px;
-  background: var(--el-color-warning-light-9);
-  border-radius: 4px;
+  font-size: 11px;
+  color: #974f00;
 }
 
-.card-meta-middle {
+.card-mid {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #6b778c;
+  margin-bottom: 6px;
+}
+
+.sp {
+  font-weight: 700;
+}
+
+.subtasks {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
-}
-
-.epic-badge {
-  font-size: 11px;
-  color: var(--el-text-color-secondary);
-}
-
-.sp-pill {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: var(--el-fill-color);
-  color: var(--el-text-color-regular);
-}
-
-.subtask-progress-box {
+  gap: 6px;
   margin-bottom: 8px;
-}
-
-.subtask-ratio {
   font-size: 10px;
-  color: var(--el-text-color-placeholder);
-  display: block;
-  margin-bottom: 2px;
+  color: #6b778c;
 }
 
-.card-footer-row {
+.subtasks i {
+  flex: 1;
+  height: 3px;
+  background: #dfe1e6;
+}
+
+.subtasks b {
+  display: block;
+  height: 100%;
+  background: #0052cc;
+}
+
+.card-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 4px;
 }
 
-.tags-cluster {
+.tags {
   display: flex;
-  gap: 4px;
   flex-wrap: wrap;
+  gap: 4px;
 }
 
-.chip {
+.tags span {
   font-size: 10px;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: var(--el-fill-color);
-  color: var(--el-text-color-secondary);
+  padding: 0 5px;
+  background: #f4f5f7;
+  color: #5e6c84;
+  border-radius: 2px;
 }
 
-.assignee-box {
+.avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 11px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  color: var(--el-text-color-regular);
+  justify-content: center;
 }
 
-.card-hover-actions {
-  margin-top: 8px;
-  padding-top: 6px;
-  border-top: 1px dashed var(--el-border-color-lighter);
+.card-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 4px;
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px solid #f4f5f7;
 }
 
 .empty-lane {
+  padding: 24px 0;
   text-align: center;
-  padding: 30px 0;
   font-size: 12px;
-  color: var(--el-text-color-placeholder);
+  color: #97a0af;
 }
 
-/* 抽屉 */
-.card-drawer-content {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.drawer-header-block h3 {
-  margin: 0 0 6px;
-  font-size: 16px;
+.drawer-body h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
 }
 
 .drawer-desc {
+  margin: 0 0 16px;
+  color: #5e6c84;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+  margin: 0 0 20px;
+}
+
+.meta-grid dt {
+  font-size: 11px;
+  color: #6b778c;
+  margin-bottom: 2px;
+}
+
+.meta-grid dd {
   margin: 0;
   font-size: 13px;
-  color: var(--el-text-color-secondary);
-  line-height: 1.5;
 }
 
-.dep-section {
-  padding-top: 12px;
-  border-top: 1px solid var(--el-border-color-light);
+.dep-section h4 {
+  margin: 0 0 4px;
+  font-size: 13px;
 }
 
-.dep-top h4 {
-  margin: 0;
-  font-size: 14px;
-}
-
-.dep-tip {
+.dep-tip,
+.no-dep {
   font-size: 12px;
-  color: var(--el-text-color-secondary);
+  color: #6b778c;
 }
 
-.dep-container {
-  margin: 10px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.no-dep-tip {
-  font-size: 12px;
-  color: var(--el-text-color-placeholder);
-}
-
-.dep-item-box {
+.dep-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  background: var(--el-fill-color-light);
-  border-radius: 6px;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: #f4f5f7;
 }
 
-.dep-title {
-  font-size: 13px;
-  font-weight: 500;
+.dep-row span {
   flex: 1;
-  margin-left: 8px;
+  font-size: 13px;
 }
 
-.dep-add-bar {
+.dep-add {
   display: flex;
   gap: 8px;
+  margin-top: 12px;
 }
 
-.drawer-action-row {
+.drawer-foot {
   margin-top: 24px;
   display: flex;
   justify-content: flex-end;

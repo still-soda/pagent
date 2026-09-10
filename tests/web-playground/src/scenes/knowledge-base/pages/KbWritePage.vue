@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Document, Edit } from '@element-plus/icons-vue'
@@ -12,7 +12,7 @@ const TAG_POOL = ['发布', '评审', '简报', '3.0', '数据', '风险', '预�
 
 const route = useRoute()
 const router = useRouter()
-const { docs, save, remove, get } = useDocsStore()
+const { docs, save, remove, get, resetEpoch } = useDocsStore()
 
 const editorRef = ref<InstanceType<typeof DocEditor> | null>(null)
 const title = ref('')
@@ -48,7 +48,11 @@ function loadDoc(doc: SavedDoc) {
   router.replace({ query: { doc: doc.id } })
 }
 
-function startNewDoc() {
+watch(resetEpoch, () => {
+  startNewDoc({ silent: true })
+})
+
+function startNewDoc(opts?: { silent?: boolean }) {
   editingId.value = null
   title.value = ''
   tags.value = []
@@ -58,7 +62,7 @@ function startNewDoc() {
   savedAt.value = null
   dirty.value = false
   router.replace({ query: {} })
-  ElMessage.info('已切换到新建文档')
+  if (!opts?.silent) ElMessage.info('已切换到新建文档')
 }
 
 function saveDoc() {

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useSceneOracle } from '../../oracle'
+import { verifyDevOps } from './verify'
 import {
   Check,
   Delete,
@@ -42,12 +44,27 @@ function selectServiceAndGo(service: MicroService, tab: typeof activeTab.value =
 
 function tabName(t: typeof activeTab.value): string {
   switch (t) {
-    case 'catalog': return '服务总览与指标'
+    case 'catalog': return '服务总览'
     case 'pipeline': return '发布流水线'
     case 'terminal': return '实例与终端诊断'
     case 'config': return '环境配置中心'
     case 'traffic': return '网关与流量控制'
   }
+}
+
+function statusLabel(status: MicroService['status']) {
+  if (status === 'healthy') return 'Running'
+  if (status === 'deploying') return 'Updating'
+  if (status === 'warning') return 'Warning'
+  return 'Failed'
+}
+
+function stageClass(index: number) {
+  if (pipelineStatus.value === 'idle' && currentStepIndex.value === 0) return ''
+  if (pipelineStatus.value === 'failed' && index === 3) return 'failed'
+  if (currentStepIndex.value > index || pipelineStatus.value === 'success') return 'done'
+  if (pipelineStatus.value === 'running' && currentStepIndex.value === index) return 'running'
+  return ''
 }
 
 /* ---------- 部署流水线状态 ---------- */
@@ -117,7 +134,12 @@ function applyTrafficRule() {
 }
 
 /* ---------- 执行部署流水线 ---------- */
+let deployGeneration = 0
+
 async function startDeploy() {
+  const generation = ++deployGeneration
+  const stillCurrent = () => generation === deployGeneration
+
   pipelineStatus.value = 'running'
   selectedService.value.status = 'deploying'
   currentStepIndex.value = 0
@@ -125,21 +147,25 @@ async function startDeploy() {
 
   // 步骤 1: 源码编译拉取
   await new Promise((r) => setTimeout(r, 800))
+  if (!stillCurrent()) return
   currentStepIndex.value = 1
   appendLog('info', 'Source checkout: commit 7f8d9b (feat: optimize settlement state machine). Build OK.')
 
   // 步骤 2: Docker 镜像构建
   await new Promise((r) => setTimeout(r, 900))
+  if (!stillCurrent()) return
   currentStepIndex.value = 2
   appendLog('info', 'Image build: registry.xinglan.internal/prod-core/payment-service:v2.4.0 verified.')
 
   // 步骤 3: Kubernetes 调度
   await new Promise((r) => setTimeout(r, 1000))
+  if (!stillCurrent()) return
   currentStepIndex.value = 3
   appendLog('info', 'Kubernetes Deployment rolling update started. 3 new pods provisioned.')
 
   // 步骤 4: 检查探针
   await new Promise((r) => setTimeout(r, 1100))
+  if (!stillCurrent()) return
 
   const hasRedis = envConfigs.some(
     (e) => e.key.trim() === 'REDIS_HOST' && e.value.trim().length > 0,
@@ -182,146 +208,157 @@ async function startDeploy() {
     ElMessage.success('部署流水线全部通过！请切换至「网关与流量控制」将流量切至 100% 完成全量上线')
   }
 }
+
+function replaceArray<T>(target: T[], next: T[]) {
+  target.splice(0, target.length, ...next)
+}
+
+function resetDevOps() {
+  deployGeneration += 1
+  activeTab.value = 'catalog'
+  replaceArray(services, JSON.parse(JSON.stringify(initialServices)))
+  selectedNamespace.value = 'all'
+  serviceSearch.value = ''
+  selectedServiceId.value = 'svc-payment'
+  pipelineStatus.value = 'idle'
+  currentStepIndex.value = 0
+  deployVersion.value = 'v2.4.0'
+  pods.value = JSON.parse(JSON.stringify(samplePods))
+  logs.value = JSON.parse(JSON.stringify(baseTerminalLogs))
+  logFilterLevel.value = 'all'
+  replaceArray(envConfigs, JSON.parse(JSON.stringify(initialEnvConfigs)))
+  envSearch.value = ''
+  trafficSlider.value = 10
+}
+
+useSceneOracle('devops', {
+  verify: () =>
+    verifyDevOps({
+      services,
+      envConfigs,
+      pods: pods.value,
+      pipelineStatus: pipelineStatus.value,
+    }),
+  reset: resetDevOps,
+})
 </script>
 
 <template>
   <div class="devops-workbench">
-    <!-- 顶部集群与微服务概览条 -->
-    <header class="cluster-header">
-      <div class="cluster-title-box">
-        <div class="cluster-icon">
-          <el-icon :size="20"><Monitor /></el-icon>
-        </div>
-        <div class="cluster-info">
-          <h2>星澜微服务云原生控制台 · 华东生产主集群</h2>
-          <span class="sub">ali-k8s-prod-east2 | Kubernetes v1.30.2 | 24 Nodes | 核心集群健康度 99.8%</span>
-        </div>
+    <header class="cluster-bar">
+      <div class="crumb">
+        <el-icon :size="14"><Monitor /></el-icon>
+        <span>prod-east2</span>
+        <span class="sep">/</span>
+        <span>{{ selectedService.namespace }}</span>
+        <span class="sep">/</span>
+        <span class="crumb-svc">{{ selectedService.name }}</span>
       </div>
-
-      <div class="cluster-quick-stats">
-        <div class="quick-stat-item">
-          <span class="k">微服务总数</span>
-          <span class="v">{{ services.length }} 个</span>
-        </div>
-        <div class="quick-stat-item">
-          <span class="k">正在操作微服务</span>
-          <span class="v text-primary">{{ selectedService.name }} ({{ selectedService.currentVersion }})</span>
-        </div>
-        <div class="quick-stat-item">
-          <span class="k">灰度切流权重</span>
-          <span class="v text-success">{{ selectedService.trafficWeight }}%</span>
-        </div>
+      <div class="cluster-meta">
+        <span>Kubernetes 1.30.2</span>
+        <span class="dot" />
+        <span>24 nodes</span>
+        <span class="dot" />
+        <span>{{ services.length }} services</span>
+        <span class="status-chip" :class="selectedService.status">
+          {{ statusLabel(selectedService.status) }}
+        </span>
+        <span class="weight">canary {{ selectedService.trafficWeight }}%</span>
       </div>
     </header>
 
-    <!-- 业务职责多 Tab 导航 -->
-    <div class="workbench-tabs-bar">
-      <el-tabs v-model="activeTab" class="custom-tabs">
-        <el-tab-pane label="服务总览与指标 (Catalog)" name="catalog" />
-        <el-tab-pane label="版本发布流水线 (Pipeline)" name="pipeline" />
-        <el-tab-pane label="实例与终端诊断 (Terminal)" name="terminal" />
-        <el-tab-pane label="环境配置中心 (ConfigMap)" name="config" />
-        <el-tab-pane label="网关与流量控制 (Traffic)" name="traffic" />
+    <div class="console-tabs">
+      <el-tabs v-model="activeTab">
+        <el-tab-pane label="服务总览" name="catalog" />
+        <el-tab-pane label="发布流水线" name="pipeline" />
+        <el-tab-pane label="实例与终端诊断" name="terminal" />
+        <el-tab-pane label="环境配置中心" name="config" />
+        <el-tab-pane label="网关与流量控制" name="traffic" />
       </el-tabs>
     </div>
 
-    <!-- Tab 1: 服务总览与指标 -->
     <section v-if="activeTab === 'catalog'" class="tab-pane-view">
       <div class="catalog-toolbar">
-        <div class="toolbar-left">
-          <span class="filter-lbl">命名空间：</span>
-          <el-radio-group v-model="selectedNamespace" size="small">
-            <el-radio-button label="all">全部 (16)</el-radio-button>
-            <el-radio-button label="prod-core">prod-core 核心 (6)</el-radio-button>
-            <el-radio-button label="prod-biz">prod-biz 业务 (7)</el-radio-button>
-            <el-radio-button label="infra">infra 基建 (3)</el-radio-button>
-          </el-radio-group>
+        <div class="ns-filters">
+          <button
+            v-for="ns in [
+              { id: 'all', label: '全部' },
+              { id: 'prod-core', label: 'prod-core' },
+              { id: 'prod-biz', label: 'prod-biz' },
+              { id: 'infra', label: 'infra' },
+            ]"
+            :key="ns.id"
+            type="button"
+            class="ns-chip"
+            :class="{ active: selectedNamespace === ns.id }"
+            @click="selectedNamespace = ns.id"
+          >
+            {{ ns.label }}
+          </button>
         </div>
-        <div class="toolbar-right">
-          <el-input
-            v-model="serviceSearch"
-            placeholder="搜索微服务名称..."
-            :prefix-icon="Search"
-            clearable
-            size="small"
-            style="width: 240px"
-          />
-        </div>
+        <el-input
+          v-model="serviceSearch"
+          placeholder="按服务名过滤"
+          :prefix-icon="Search"
+          clearable
+          size="small"
+          style="width: 220px"
+        />
       </div>
 
-      <div class="service-table-box">
-        <el-table :data="filteredServices" stripe border style="width: 100%">
-          <el-table-column prop="name" label="微服务标识" min-width="180">
+      <div class="table-wrap">
+        <el-table
+          :data="filteredServices"
+          style="width: 100%"
+          size="small"
+          highlight-current-row
+          :row-class-name="(data: { row: MicroService }) => (data.row.id === selectedServiceId ? 'is-selected' : '')"
+          @row-click="(row: MicroService) => (selectedServiceId = row.id)"
+        >
+          <el-table-column prop="name" label="服务" min-width="200">
             <template #default="{ row }">
-              <span class="svc-name" :class="{ 'svc-active': row.id === selectedServiceId }">
-                {{ row.name }}
-              </span>
-              <el-tag v-if="row.id === selectedServiceId" size="small" type="primary" style="margin-left: 6px">
-                当前选定
-              </el-tag>
+              <span class="svc-name">{{ row.name }}</span>
             </template>
           </el-table-column>
-
           <el-table-column prop="namespace" label="命名空间" width="120">
             <template #default="{ row }">
-              <el-tag size="small" effect="plain">{{ row.namespace }}</el-tag>
+              <span class="ns-text">{{ row.namespace }}</span>
             </template>
           </el-table-column>
-
-          <el-table-column prop="currentVersion" label="当前版本" width="110">
+          <el-table-column prop="currentVersion" label="版本" width="100">
             <template #default="{ row }">
               <span class="code-font">{{ row.currentVersion }}</span>
             </template>
           </el-table-column>
-
-          <el-table-column prop="status" label="运行状态" width="110" align="center">
+          <el-table-column prop="status" label="状态" width="120">
             <template #default="{ row }">
-              <el-tag
-                :type="row.status === 'healthy' ? 'success' : row.status === 'deploying' ? 'primary' : 'danger'"
-                size="small"
-              >
-                {{ row.status === 'healthy' ? '健康就绪' : row.status === 'deploying' ? '发布中' : '异常报警' }}
-              </el-tag>
+              <span class="status-dot" :class="row.status" />
+              {{ statusLabel(row.status) }}
             </template>
           </el-table-column>
-
-          <el-table-column prop="replicas" label="Pod 副本" width="100" align="center">
+          <el-table-column label="Ready" width="90" align="center">
             <template #default="{ row }">
-              <span>{{ row.readyReplicas }} / {{ row.replicas }}</span>
+              {{ row.readyReplicas }}/{{ row.replicas }}
             </template>
           </el-table-column>
-
-          <el-table-column prop="cpuUsage" label="CPU 负荷" width="130">
+          <el-table-column prop="cpuUsage" label="CPU" width="140">
             <template #default="{ row }">
-              <el-progress :percentage="row.cpuUsage" :stroke-width="6" :show-text="false" />
-              <span class="meter-text">{{ row.cpuUsage }}%</span>
+              <div class="cpu-cell">
+                <span class="cpu-bar"><i :style="{ width: row.cpuUsage + '%' }" /></span>
+                <span>{{ row.cpuUsage }}%</span>
+              </div>
             </template>
           </el-table-column>
-
-          <el-table-column prop="trafficWeight" label="流量分配" width="110" align="center">
-            <template #default="{ row }">
-              <span class="code-font text-success">{{ row.trafficWeight }}%</span>
-            </template>
+          <el-table-column prop="trafficWeight" label="流量" width="80" align="center">
+            <template #default="{ row }">{{ row.trafficWeight }}%</template>
           </el-table-column>
-
-          <el-table-column prop="lastDeployed" label="最近部署时间" width="170" />
-
-          <el-table-column label="管理操作" width="180" fixed="right">
+          <el-table-column prop="lastDeployed" label="最近发布" width="170" />
+          <el-table-column label="" width="170" fixed="right">
             <template #default="{ row }">
-              <el-button
-                type="primary"
-                link
-                size="small"
-                @click="selectServiceAndGo(row, 'pipeline')"
-              >
+              <el-button type="primary" link size="small" @click.stop="selectServiceAndGo(row, 'pipeline')">
                 发布流水线
               </el-button>
-              <el-button
-                type="info"
-                link
-                size="small"
-                @click="selectServiceAndGo(row, 'config')"
-              >
+              <el-button type="primary" link size="small" @click.stop="selectServiceAndGo(row, 'config')">
                 配置中心
               </el-button>
             </template>
@@ -330,268 +367,242 @@ async function startDeploy() {
       </div>
     </section>
 
-    <!-- Tab 2: 版本发布流水线 -->
-    <section v-else-if="activeTab === 'pipeline'" class="tab-pane-view">
-      <div class="pipeline-container">
-        <div class="pipeline-card">
-          <div class="card-title-row">
-            <h3>微服务发布流水线 · {{ selectedService.name }}</h3>
-            <span class="version-badge">当前运行：{{ selectedService.currentVersion }}</span>
-          </div>
+    <section v-else-if="activeTab === 'pipeline'" class="tab-pane-view pipeline-view">
+      <div class="deploy-toolbar">
+        <label>
+          服务
+          <el-select v-model="selectedServiceId" size="small" style="width: 200px">
+            <el-option v-for="s in services" :key="s.id" :label="s.name" :value="s.id" />
+          </el-select>
+        </label>
+        <label>
+          目标版本
+          <el-select v-model="deployVersion" size="small" style="width: 180px">
+            <el-option label="v2.4.0" value="v2.4.0" />
+            <el-option label="v2.4.1-rc1" value="v2.4.1-rc1" />
+            <el-option label="v2.3.0" value="v2.3.0" />
+          </el-select>
+        </label>
+        <span class="running-ver">当前 {{ selectedService.currentVersion }}</span>
+        <el-button
+          id="btn-trigger-deploy"
+          type="primary"
+          size="small"
+          :loading="pipelineStatus === 'running'"
+          @click="startDeploy"
+        >
+          {{ pipelineStatus === 'failed' ? '重新执行发布' : '开始灰度发布' }}
+        </el-button>
+      </div>
 
-          <div class="pipeline-form-row">
-            <div class="form-item">
-              <label>目标服务：</label>
-              <el-select v-model="selectedServiceId" style="width: 220px">
-                <el-option
-                  v-for="s in services"
-                  :key="s.id"
-                  :label="s.name"
-                  :value="s.id"
-                />
-              </el-select>
-            </div>
+      <div class="pipeline-board">
+        <div class="pipe-stage" :class="stageClass(0)">
+          <div class="pipe-name">Build</div>
+          <div class="pipe-desc">源码拉取与编译</div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-stage" :class="stageClass(1)">
+          <div class="pipe-name">Package</div>
+          <div class="pipe-desc">镜像构建与扫描</div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-stage" :class="stageClass(2)">
+          <div class="pipe-name">Rollout</div>
+          <div class="pipe-desc">Pod 滚动更新</div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-stage" :class="[stageClass(3), { failed: pipelineStatus === 'failed' }]">
+          <div class="pipe-name">Health</div>
+          <div class="pipe-desc">存活与健康检查</div>
+        </div>
+      </div>
 
-            <div class="form-item">
-              <label>发布目标版本：</label>
-              <el-select v-model="deployVersion" style="width: 220px">
-                <el-option label="v2.4.0 (待灰度优化版本)" value="v2.4.0" />
-                <el-option label="v2.4.1-rc1 (测试版)" value="v2.4.1-rc1" />
-                <el-option label="v2.3.0 (回滚基础版本)" value="v2.3.0" />
-              </el-select>
-            </div>
+      <div v-if="pipelineStatus === 'failed'" class="console-alert is-error">
+        <el-icon :size="16"><WarningFilled /></el-icon>
+        <div>
+          <strong>job failed · livenessProbe timeout</strong>
+          <p>
+            payment-service-7f8d9b-z55yt CrashLoopBackOff。查看
+            <button type="button" class="text-link" @click="activeTab = 'terminal'">实例与终端诊断</button>
+            日志，并在
+            <button type="button" class="text-link" @click="activeTab = 'config'">环境配置中心</button>
+            补全缺失变量后重跑。
+          </p>
+        </div>
+      </div>
 
-            <div class="form-actions">
-              <el-button
-                id="btn-trigger-deploy"
-                type="primary"
-                :loading="pipelineStatus === 'running'"
-                @click="startDeploy"
-              >
-                {{ pipelineStatus === 'failed' ? '重新执行发布' : '开始灰度发布' }}
-              </el-button>
-            </div>
-          </div>
-
-          <!-- 步骤条 -->
-          <div class="stepper-box">
-            <el-steps :active="currentStepIndex" finish-status="success" align-center>
-              <el-step title="源码拉取与编译" description="Git commit 检出与构建" />
-              <el-step title="安全与容器打包" description="CVE 扫描与 Docker Push" />
-              <el-step title="Pod 滚动更新" description="K8s Deployment 调度" />
-              <el-step
-                title="存活与健康检查"
-                :status="pipelineStatus === 'failed' ? 'error' : undefined"
-                description="Liveness / Readiness 探针"
-              />
-            </el-steps>
-          </div>
-
-          <!-- 状态提示与排障向导 -->
-          <div v-if="pipelineStatus === 'failed'" class="pipeline-alert-box alert-error">
-            <div class="alert-icon">
-              <el-icon :size="20"><WarningFilled /></el-icon>
-            </div>
-            <div class="alert-text">
-              <h4>部署流水线中断：Pod 存活探针健康检查失败！</h4>
-              <p>
-                容器副本频繁崩溃重启 (CrashLoopBackOff)。请立即切换至
-                <el-button type="danger" link @click="activeTab = 'terminal'">「实例与终端诊断」</el-button>
-                查看崩溃报错日志，并在
-                <el-button type="primary" link @click="activeTab = 'config'">「环境配置中心」</el-button>
-                补全缺失的环境变量后重新部署。
-              </p>
-            </div>
-          </div>
-
-          <div v-else-if="pipelineStatus === 'success'" class="pipeline-alert-box alert-success">
-            <div class="alert-icon">
-              <el-icon :size="20"><Check /></el-icon>
-            </div>
-            <div class="alert-text">
-              <h4>版本 {{ deployVersion }} 部署就绪！所有 Pod 健康检查通过 (3/3 Ready)</h4>
-              <p>
-                金丝雀部署验证成功。请前往
-                <el-button type="success" link @click="activeTab = 'traffic'">「网关与流量控制」</el-button>
-                将灰度切流权重提升至 100% 完成最终全量上线。
-              </p>
-            </div>
-          </div>
+      <div v-else-if="pipelineStatus === 'success'" class="console-alert is-ok">
+        <el-icon :size="16"><Check /></el-icon>
+        <div>
+          <strong>{{ deployVersion }} 已就绪 · 3/3 Ready</strong>
+          <p>
+            到
+            <button type="button" class="text-link" @click="activeTab = 'traffic'">网关与流量控制</button>
+            把灰度权重调到 100% 完成上线。
+          </p>
         </div>
       </div>
     </section>
 
-    <!-- Tab 3: 实例与终端诊断 -->
-    <section v-else-if="activeTab === 'terminal'" class="tab-pane-view">
-      <div class="terminal-layout">
-        <!-- 上部分：Pod 副本状态表 -->
-        <div class="pods-card">
-          <div class="card-title-row">
-            <h3>{{ selectedService.name }} 容器副本集群列表 (Pods)</h3>
-            <span class="sub-tip">健康副本数：{{ pods.filter(p => p.ready).length }}/{{ pods.length }}</span>
-          </div>
-
-          <el-table :data="pods" border size="small" style="width: 100%">
-            <el-table-column prop="name" label="Pod 实例名称" min-width="220">
-              <template #default="{ row }">
-                <span class="code-font">{{ row.name }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="status" label="状态" width="140" align="center">
-              <template #default="{ row }">
-                <el-tag :type="row.ready ? 'success' : 'danger'" size="small">
-                  {{ row.status }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="restarts" label="重启次数" width="90" align="center">
-              <template #default="{ row }">
-                <span :class="{ 'text-danger font-bold': row.restarts > 0 }">{{ row.restarts }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="ip" label="Pod IP" width="130" />
-            <el-table-column prop="node" label="所在宿主机 Node" min-width="190" />
-            <el-table-column prop="startTime" label="启动时间" width="160" />
-          </el-table>
+    <section v-else-if="activeTab === 'terminal'" class="tab-pane-view terminal-view">
+      <div class="pods-strip">
+        <div class="strip-title">
+          Pods
+          <span>{{ pods.filter((p) => p.ready).length }}/{{ pods.length }} Ready</span>
         </div>
-
-        <!-- 下部分：排障黑底控制台终端 (CDP 抓取与文本检索点) -->
-        <div class="terminal-card">
-          <div class="terminal-topbar">
-            <div class="term-title">
-              <span>终端标准输出与错误日志 (stdout / stderr)</span>
-              <el-tag size="small" type="info">实时链路抓取点</el-tag>
-            </div>
-
-            <div class="term-controls">
-              <el-radio-group v-model="logFilterLevel" size="small">
-                <el-radio-button label="all">全部</el-radio-button>
-                <el-radio-button label="info">INFO</el-radio-button>
-                <el-radio-button label="warn">WARN</el-radio-button>
-                <el-radio-button label="error">ERROR</el-radio-button>
-              </el-radio-group>
-              <el-button size="small" :icon="RefreshRight" link @click="appendLog('info', 'Manual poll buffer sync OK')">
-                刷新
-              </el-button>
-            </div>
-          </div>
-
-          <div class="terminal-console" id="k8s-log-terminal">
-            <div
-              v-for="(item, idx) in filteredLogs"
-              :key="idx"
-              class="console-row"
-              :class="`level-${item.level}`"
-            >
-              <span class="ts">{{ item.timestamp }}</span>
-              <span class="lvl">[{{ item.level.toUpperCase() }}]</span>
-              <span class="trace">[{{ item.traceId }}]</span>
-              <span class="log-msg">{{ item.message }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Tab 4: 环境配置中心 -->
-    <section v-else-if="activeTab === 'config'" class="tab-pane-view">
-      <div class="config-card">
-        <div class="config-header">
-          <div class="cfg-title">
-            <h3>生产微服务环境配置中心 · ConfigMap & Secrets</h3>
-            <span class="cfg-sub">包含 12+ 项生产级数据库、消息队列与微服务集群参数，支持在线编辑热加载</span>
-          </div>
-          <div class="cfg-actions">
-            <el-input
-              v-model="envSearch"
-              placeholder="搜索配置键名 (如 REDIS)..."
-              :prefix-icon="Search"
-              size="small"
-              clearable
-              style="width: 240px"
-            />
-            <el-button type="primary" size="small" :icon="Plus" @click="addEnvItem">
-              添加环境变量
-            </el-button>
-            <el-button id="btn-save-configs" type="success" size="small" @click="saveEnvConfigs">
-              保存并热加载配置
-            </el-button>
-          </div>
-        </div>
-
-        <el-table :data="filteredEnvConfigs" border stripe style="width: 100%">
-          <el-table-column prop="key" label="配置项键名 (KEY)" min-width="240">
+        <el-table :data="pods" size="small" style="width: 100%">
+          <el-table-column prop="name" label="NAME" min-width="240">
             <template #default="{ row }">
-              <el-input v-model="row.key" placeholder="如 REDIS_HOST" size="small" />
+              <span class="code-font">{{ row.name }}</span>
             </template>
           </el-table-column>
+          <el-table-column prop="status" label="STATUS" width="160">
+            <template #default="{ row }">
+              <span class="status-dot" :class="row.ready ? 'healthy' : 'failed'" />
+              {{ row.status }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="restarts" label="RESTARTS" width="100" align="center">
+            <template #default="{ row }">
+              <span :class="{ 'text-danger': row.restarts > 0 }">{{ row.restarts }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="ip" label="IP" width="130" />
+          <el-table-column prop="node" label="NODE" min-width="180" />
+          <el-table-column prop="startTime" label="AGE" width="160" />
+        </el-table>
+      </div>
 
-          <el-table-column prop="value" label="配置项值 (VALUE)" min-width="320">
+      <div class="log-panel">
+        <div class="log-toolbar">
+          <span class="log-path">kubectl logs -f {{ selectedService.name }} --tail=200</span>
+          <div class="term-controls">
+            <el-radio-group v-model="logFilterLevel" size="small">
+              <el-radio-button label="all">all</el-radio-button>
+              <el-radio-button label="info">info</el-radio-button>
+              <el-radio-button label="warn">warn</el-radio-button>
+              <el-radio-button label="error">error</el-radio-button>
+            </el-radio-group>
+            <el-button size="small" :icon="RefreshRight" link @click="appendLog('info', 'Manual poll buffer sync OK')">
+              刷新
+            </el-button>
+          </div>
+        </div>
+        <div id="k8s-log-terminal" class="terminal-console">
+          <div
+            v-for="(item, idx) in filteredLogs"
+            :key="idx"
+            class="console-row"
+            :class="`level-${item.level}`"
+          >
+            <span class="ts">{{ item.timestamp }}</span>
+            <span class="lvl">{{ item.level.toUpperCase() }}</span>
+            <span class="trace">{{ item.traceId }}</span>
+            <span class="log-msg">{{ item.message }}</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section v-else-if="activeTab === 'config'" class="tab-pane-view">
+      <div class="config-toolbar">
+        <div class="cfg-path">
+          ConfigMap
+          <span>payment-service-config</span>
+          · {{ selectedService.namespace }}
+        </div>
+        <div class="cfg-actions">
+          <el-input
+            v-model="envSearch"
+            placeholder="搜索 KEY，如 REDIS"
+            :prefix-icon="Search"
+            size="small"
+            clearable
+            style="width: 220px"
+          />
+          <el-button size="small" :icon="Plus" @click="addEnvItem">添加环境变量</el-button>
+          <el-button id="btn-save-configs" type="primary" size="small" @click="saveEnvConfigs">
+            保存并热加载配置
+          </el-button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <el-table :data="filteredEnvConfigs" size="small" style="width: 100%">
+          <el-table-column prop="key" label="KEY" min-width="220">
+            <template #default="{ row }">
+              <el-input v-model="row.key" placeholder="REDIS_HOST" size="small" />
+            </template>
+          </el-table-column>
+          <el-table-column prop="value" label="VALUE" min-width="300">
             <template #default="{ row }">
               <el-input
                 v-model="row.value"
                 :show-password="row.isSecret"
-                placeholder="输入环境变量值，如 redis-cluster.internal:6379"
+                placeholder="redis-cluster.internal:6379"
                 size="small"
               />
             </template>
           </el-table-column>
-
-          <el-table-column prop="description" label="说明" min-width="200">
+          <el-table-column prop="description" label="说明" min-width="220">
             <template #default="{ row }">
               <span class="desc-text">{{ row.description }}</span>
             </template>
           </el-table-column>
-
-          <el-table-column label="操作" width="80" align="center">
+          <el-table-column label="" width="64" align="center">
             <template #default="{ $index }">
-              <el-button
-                type="danger"
-                link
-                size="small"
-                :icon="Delete"
-                @click="removeEnvItem($index)"
-              />
+              <el-button type="danger" link size="small" :icon="Delete" @click="removeEnvItem($index)" />
             </template>
           </el-table-column>
         </el-table>
       </div>
     </section>
 
-    <!-- Tab 5: 网关与流量控制 -->
-    <section v-else-if="activeTab === 'traffic'" class="tab-pane-view">
-      <div class="traffic-card">
-        <div class="traffic-header">
-          <h3>Ingress 网关金丝雀切流规则 (Canary Routing)</h3>
-          <p class="traffic-desc">
-            控制 {{ selectedService.name }} 生产环境流量分配。当所有 Pods 健康稳定后，将金丝雀流量由 10% 提升至 100% 完成全量放行。
-          </p>
+    <section v-else-if="activeTab === 'traffic'" class="tab-pane-view traffic-view">
+      <div class="route-panel">
+        <div class="route-head">
+          <div>
+            <div class="route-title">Ingress / {{ selectedService.name }}</div>
+            <div class="route-sub">canary 权重写入后立即对 prod-east2 网关生效</div>
+          </div>
+          <el-button
+            id="btn-apply-canary"
+            type="primary"
+            size="small"
+            :disabled="trafficSlider === 0"
+            @click="applyTrafficRule"
+          >
+            应用网关切流规则
+          </el-button>
         </div>
 
-        <div class="traffic-body">
-          <div class="slider-wrapper">
-            <div class="slider-info">
-              <span class="lbl">灰度流量切分权重：</span>
-              <span class="weight-display">{{ trafficSlider }}%</span>
+        <div class="split-bars">
+          <div class="split-col">
+            <span class="split-label">stable · {{ selectedService.currentVersion }}</span>
+            <div class="split-meter">
+              <i :style="{ width: 100 - trafficSlider + '%' }" />
             </div>
-            <el-slider
-              v-model="trafficSlider"
-              :step="10"
-              :marks="{ 0: '0%', 10: '10% (灰度)', 50: '50%', 100: '100% (全量发布)' }"
-            />
+            <strong>{{ 100 - trafficSlider }}%</strong>
           </div>
+          <div class="split-col canary">
+            <span class="split-label">canary · {{ deployVersion }}</span>
+            <div class="split-meter">
+              <i :style="{ width: trafficSlider + '%' }" />
+            </div>
+            <strong>{{ trafficSlider }}%</strong>
+          </div>
+        </div>
 
-          <div class="traffic-action-box">
-            <el-button
-              id="btn-apply-canary"
-              type="success"
-              size="large"
-              :disabled="trafficSlider === 0"
-              @click="applyTrafficRule"
-            >
-              应用网关切流规则
-            </el-button>
+        <div class="slider-block">
+          <div class="slider-info">
+            <span>灰度流量切分权重</span>
+            <b>{{ trafficSlider }}%</b>
           </div>
+          <el-slider
+            v-model="trafficSlider"
+            :step="10"
+            :marks="{ 0: '0%', 10: '10%', 50: '50%', 100: '100%' }"
+          />
         </div>
       </div>
     </section>
@@ -602,366 +613,484 @@ async function startDeploy() {
 .devops-workbench {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 16px;
-  height: calc(100vh - 120px);
-  overflow-y: auto;
+  height: 100%;
+  background: #f6f7f9;
+  color: #1f2329;
 }
 
-.cluster-header {
+.cluster-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 20px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 10px;
-}
-
-.cluster-title-box {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.cluster-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  background: var(--el-color-primary-light-9);
-  color: var(--el-color-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.cluster-info h2 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.cluster-info .sub {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.cluster-quick-stats {
-  display: flex;
-  gap: 20px;
-}
-
-.quick-stat-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  text-align: right;
-}
-
-.quick-stat-item .k {
-  font-size: 11px;
-  color: var(--el-text-color-secondary);
-}
-
-.quick-stat-item .v {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.text-primary {
-  color: var(--el-color-primary);
-}
-.text-success {
-  color: var(--el-color-success);
-}
-.text-danger {
-  color: var(--el-color-danger);
-}
-
-.workbench-tabs-bar {
-  background: var(--el-bg-color);
+  gap: 16px;
   padding: 0 16px;
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
+  height: 40px;
+  background: #1f2329;
+  color: #d8dee6;
+  font-size: 12px;
+}
+
+.crumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.crumb .sep {
+  color: #6b7280;
+}
+
+.crumb-svc {
+  color: #fff;
+}
+
+.cluster-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #9aa3af;
+}
+
+.cluster-meta .dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #6b7280;
+}
+
+.status-chip {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.16);
+}
+
+.status-chip.deploying {
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.18);
+}
+
+.status-chip.failed {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.18);
+}
+
+.weight {
+  color: #e5e7eb;
+}
+
+.console-tabs {
+  background: #fff;
+  padding: 0 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.console-tabs :deep(.el-tabs__header) {
+  margin: 0;
+}
+
+.console-tabs :deep(.el-tabs__nav-wrap::after) {
+  display: none;
+}
+
+.console-tabs :deep(.el-tabs__item) {
+  height: 40px;
+  font-size: 13px;
 }
 
 .tab-pane-view {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  overflow: auto;
 }
 
-/* Catalog 表格 */
-.catalog-toolbar {
+.catalog-toolbar,
+.config-toolbar,
+.deploy-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
+  gap: 12px;
+  padding: 10px 16px;
+  background: #fff;
+  border-bottom: 1px solid #eef0f3;
 }
 
-.filter-lbl {
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
-  margin-right: 8px;
-}
-
-.service-table-box {
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 14px;
-}
-
-.svc-name {
-  font-family: monospace;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.svc-active {
-  color: var(--el-color-primary);
-}
-
-.code-font {
-  font-family: monospace;
-  font-weight: 600;
-}
-
-.meter-text {
-  font-size: 11px;
-  color: var(--el-text-color-secondary);
-}
-
-/* Pipeline 流水线 */
-.pipeline-card,
-.pods-card,
-.terminal-card,
-.config-card,
-.traffic-card {
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 18px 20px;
-}
-
-.card-title-row {
+.ns-filters {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
+  gap: 6px;
 }
 
-.card-title-row h3 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.version-badge {
+.ns-chip {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid #d9dee6;
+  background: #fff;
+  color: #4b5563;
+  border-radius: 3px;
   font-size: 12px;
-  font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: var(--el-fill-color-light);
-  color: var(--el-color-primary);
+  cursor: pointer;
 }
 
-.pipeline-form-row {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 14px 18px;
-  background: var(--el-fill-color-light);
-  border-radius: 8px;
-  margin-bottom: 24px;
+.ns-chip.active {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #eff6ff;
 }
 
-.form-item {
+.table-wrap {
+  flex: 1;
+  background: #fff;
+}
+
+.table-wrap :deep(.is-selected) {
+  background: #f3f6fb;
+}
+
+.svc-name,
+.code-font {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.ns-text {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: #9ca3af;
+}
+
+.status-dot.healthy {
+  background: #16a34a;
+}
+
+.status-dot.deploying {
+  background: #2563eb;
+}
+
+.status-dot.failed {
+  background: #dc2626;
+}
+
+.cpu-cell {
   display: flex;
   align-items: center;
   gap: 8px;
+  font-size: 12px;
+  color: #6b7280;
 }
 
-.form-item label {
-  font-size: 13px;
-  color: var(--el-text-color-regular);
+.cpu-bar {
+  display: block;
+  width: 72px;
+  height: 4px;
+  background: #e5e7eb;
+  overflow: hidden;
 }
 
-.stepper-box {
-  padding: 24px 12px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  margin-bottom: 20px;
+.cpu-bar i {
+  display: block;
+  height: 100%;
+  background: #2563eb;
 }
 
-.pipeline-alert-box {
+.deploy-toolbar {
+  justify-content: flex-start;
+}
+
+.deploy-toolbar label {
   display: flex;
-  gap: 14px;
-  padding: 14px 18px;
-  border-radius: 8px;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #6b7280;
 }
 
-.alert-error {
-  background: var(--el-color-danger-light-9);
-  border: 1px solid var(--el-color-danger-light-5);
-  color: var(--el-color-danger);
+.running-ver {
+  font-size: 12px;
+  color: #6b7280;
 }
 
-.alert-success {
-  background: var(--el-color-success-light-9);
-  border: 1px solid var(--el-color-success-light-5);
-  color: var(--el-color-success);
+.pipeline-view,
+.traffic-view {
+  background: #fff;
 }
 
-.alert-text h4 {
-  margin: 0 0 4px;
-  font-size: 14px;
+.pipeline-board {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 24px 12px;
+}
+
+.pipe-stage {
+  min-width: 140px;
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  background: #fafafa;
+}
+
+.pipe-stage.running {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.pipe-stage.done {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.pipe-stage.failed {
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+.pipe-name {
+  font-size: 13px;
   font-weight: 600;
 }
 
-.alert-text p {
-  margin: 0;
+.pipe-desc {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.pipe-arrow {
+  color: #9ca3af;
+}
+
+.console-alert {
+  display: flex;
+  gap: 10px;
+  margin: 16px 24px 24px;
+  padding: 12px 14px;
   font-size: 13px;
   line-height: 1.5;
+  border: 1px solid #e5e7eb;
 }
 
-/* 终端 */
-.terminal-layout {
+.console-alert p {
+  margin: 4px 0 0;
+  color: #4b5563;
+}
+
+.console-alert.is-error {
+  background: #fff7f7;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.console-alert.is-ok {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.text-link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: #2563eb;
+  cursor: pointer;
+}
+
+.terminal-view {
+  background: #111318;
+}
+
+.pods-strip {
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.strip-title {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 16px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.log-panel {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
 }
 
-.terminal-topbar {
+.log-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: #191c22;
+  color: #9aa3af;
+  font-size: 12px;
 }
 
-.term-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 600;
+.log-path {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .term-controls {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .terminal-console {
-  background: #181818;
-  color: #cccccc;
-  font-family: Menlo, Monaco, Consolas, monospace;
+  flex: 1;
+  min-height: 220px;
+  overflow: auto;
+  padding: 10px 14px;
+  background: #111318;
+  color: #d1d5db;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
-  line-height: 1.6;
-  border-radius: 6px;
-  padding: 12px 16px;
-  height: 380px;
-  overflow-y: auto;
+  line-height: 1.65;
 }
 
 .console-row {
-  margin-bottom: 3px;
   word-break: break-all;
 }
 
 .console-row .ts {
-  color: #777777;
+  color: #6b7280;
   margin-right: 8px;
 }
 
 .console-row .lvl {
-  font-weight: 600;
   margin-right: 8px;
+  font-weight: 600;
 }
 
 .console-row .trace {
-  color: #4ec9b0;
+  color: #67e8f9;
   margin-right: 8px;
 }
 
 .level-info .lvl {
-  color: #4ec9b0;
+  color: #86efac;
 }
+
 .level-warn .lvl {
-  color: #ce9178;
+  color: #fbbf24;
 }
+
 .level-error {
-  color: #f48771;
+  color: #fca5a5;
 }
+
 .level-error .lvl {
-  color: #f14c4c;
-  font-weight: bold;
+  color: #f87171;
 }
 
-/* 配置中心 */
-.config-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
+.cfg-path {
+  font-size: 13px;
+  color: #6b7280;
 }
 
-.cfg-title h3 {
-  margin: 0 0 2px;
-  font-size: 15px;
-}
-
-.cfg-sub {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
+.cfg-path span {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #111827;
 }
 
 .cfg-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .desc-text {
   font-size: 12px;
-  color: var(--el-text-color-secondary);
+  color: #6b7280;
 }
 
-/* 流量控制 */
-.traffic-header h3 {
-  margin: 0 0 6px;
-  font-size: 16px;
+.route-panel {
+  max-width: 760px;
+  padding: 24px;
 }
 
-.traffic-desc {
-  margin: 0;
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
+.route-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
 }
 
-.traffic-body {
-  margin-top: 24px;
-  max-width: 600px;
+.route-title {
+  font-size: 14px;
+  font-weight: 600;
 }
 
-.slider-wrapper {
-  margin-bottom: 24px;
+.route-sub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.split-bars {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.split-col {
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  background: #fafafa;
+}
+
+.split-col.canary {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.split-label {
+  display: block;
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.split-meter {
+  height: 8px;
+  background: #e5e7eb;
+  margin-bottom: 8px;
+}
+
+.split-meter i {
+  display: block;
+  height: 100%;
+  background: #2563eb;
+}
+
+.split-col strong {
+  font-size: 18px;
 }
 
 .slider-info {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 8px;
 }
 
-.weight-display {
-  font-size: 18px;
-  font-weight: bold;
-  color: var(--el-color-primary);
+.text-danger {
+  color: #dc2626;
+  font-weight: 600;
 }
 </style>

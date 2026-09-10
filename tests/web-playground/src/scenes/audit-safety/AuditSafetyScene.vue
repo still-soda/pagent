@@ -1,14 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useSceneOracle } from '../../oracle'
+import { TARGET_TICKET_ID, verifyAudit } from './verify'
 import {
   Check,
   Close,
   Document,
-  Present,
   Search,
-  User,
-  WarnTriangleFilled,
   WarningFilled,
 } from '@element-plus/icons-vue'
 import {
@@ -21,11 +20,22 @@ import type { DisputeTicket } from './types'
 
 /* ---------- 干扰营销问卷浮层 (Dark Pattern Trap) ---------- */
 const showMarketingModal = ref(false)
+let marketingTimer: number | undefined
 
-onMounted(() => {
-  setTimeout(() => {
+function armMarketingModal() {
+  showMarketingModal.value = false
+  if (marketingTimer) window.clearTimeout(marketingTimer)
+  marketingTimer = window.setTimeout(() => {
     showMarketingModal.value = true
   }, 1200)
+}
+
+onMounted(() => {
+  armMarketingModal()
+})
+
+onBeforeUnmount(() => {
+  if (marketingTimer) window.clearTimeout(marketingTimer)
 })
 
 function closeMarketingModal() {
@@ -108,35 +118,44 @@ function submitAdjudication() {
     ElMessage.info('已驳回退款')
   }
 }
+
+function resetAudit() {
+  tickets.splice(0, tickets.length, ...JSON.parse(JSON.stringify(mockTickets)))
+  selectedTicketId.value = TARGET_TICKET_ID
+  searchKeyword.value = ''
+  filterType.value = 'all'
+  detailTab.value = 'chat'
+  showAttachment.value = true
+  decisionType.value = 'partial'
+  refundAmount.value = 1580.0
+  auditReason.value = ''
+  acknowledgedRule.value = false
+  submissionResult.value = null
+  armMarketingModal()
+}
+
+useSceneOracle('audit-safety', {
+  verify: () =>
+    verifyAudit({
+      selectedTicketId: selectedTicketId.value,
+      marketingOpen: showMarketingModal.value,
+      submitted: submissionResult.value != null,
+      decisionType: decisionType.value,
+      refundAmount: refundAmount.value,
+      passedRule: submissionResult.value?.passedRule ?? null,
+    }),
+  reset: resetAudit,
+})
 </script>
 
 <template>
   <div class="audit-workbench">
-    <!-- 顶部状态指示栏 -->
-    <header class="audit-header">
-      <div class="header-left">
-        <div class="shield-badge">
-          <el-icon :size="18"><WarnTriangleFilled /></el-icon>
-        </div>
-        <div class="header-title">
-          <h2>星澜交易风控中心 · 售后纠纷介入仲裁工作台</h2>
-          <span class="header-sub">官方人工/Agent 联合复审通道 | 当前纠纷待办池：{{ tickets.length }} 笔</span>
-        </div>
-      </div>
-      <div class="header-kpi">
-        <span class="kpi-tag">今日争议结案率 94.2%</span>
-        <span class="kpi-tag kpi-warn">超时预警工单 2 笔</span>
-      </div>
-    </header>
-
-    <!-- 主工作区：左侧工单队列，右侧三段式工作台 -->
     <div class="workbench-main">
-      <!-- 左侧：待办工单队列 (Master) -->
-      <aside class="ticket-queue-pane">
-        <div class="queue-header">
-          <div class="queue-title-row">
-            <span class="q-title">待办争议工单列表</span>
-            <el-tag size="small" type="danger">{{ filteredTickets.length }} 笔</el-tag>
+      <aside class="queue">
+        <div class="queue-head">
+          <div class="queue-title">
+            待处理
+            <b>{{ filteredTickets.length }}</b>
           </div>
           <el-input
             v-model="searchKeyword"
@@ -144,101 +163,65 @@ function submitAdjudication() {
             :prefix-icon="Search"
             size="small"
             clearable
-            style="margin-top: 8px"
           />
         </div>
-
         <div class="ticket-list">
-          <div
+          <button
             v-for="t in filteredTickets"
             :key="t.id"
-            class="ticket-item"
-            :class="{ active: t.id === selectedTicketId }"
+            type="button"
+            class="ticket-row"
+            :class="{ active: t.id === selectedTicketId, urgent: t.priority === 'urgent' }"
             @click="selectTicket(t)"
           >
-            <div class="t-top">
-              <span class="t-id">{{ t.id }}</span>
-              <el-tag :type="t.priority === 'urgent' ? 'danger' : 'info'" size="small" effect="plain">
-                {{ t.priority === 'urgent' ? '加急复审' : '常规' }}
-              </el-tag>
-            </div>
-            <div class="t-buyer">
-              <span>买家：{{ t.buyerName }}</span>
-              <span class="t-amount">¥ {{ t.orderAmount.toFixed(2) }}</span>
-            </div>
-            <div class="t-bottom">
-              <span class="t-type">{{ t.disputeType }}</span>
-              <span class="t-timeout">剩 {{ t.timeoutHours }}h</span>
-            </div>
-          </div>
+            <span class="t-id">{{ t.id }}</span>
+            <span class="t-sla">{{ t.timeoutHours }}h</span>
+            <span class="t-name">{{ t.buyerName }}</span>
+            <span class="t-amt">¥{{ t.orderAmount.toFixed(0) }}</span>
+            <span class="t-type">{{ t.disputeType }}</span>
+          </button>
         </div>
       </aside>
 
-      <!-- 右侧：选定工单详情与仲裁工作台 (Detail) -->
-      <main class="ticket-detail-pane">
-        <!-- 工单核心概览卡片 -->
-        <div class="ticket-summary-card">
-          <div class="summary-top">
-            <div class="summary-title-group">
-              <h3>工单详情：{{ activeTicket.id }}</h3>
-              <span class="ord-num">关联订单：{{ activeTicket.orderId }}</span>
-            </div>
-            <div class="buyer-credit-badge">
-              <el-icon :size="14"><User /></el-icon>
-              <span>买家诚信分：{{ activeTicket.buyerCreditScore }} (中危风险)</span>
-            </div>
+      <main class="detail">
+        <div class="order-strip">
+          <div>
+            <div class="oid">{{ activeTicket.id }}</div>
+            <div class="goods">星澜智能降噪无线耳机 Pro Max · {{ activeTicket.orderId }}</div>
           </div>
-
-          <div class="summary-grid">
-            <div class="s-cell">
-              <span class="k">涉诉商品</span>
-              <span class="v">星澜智能降噪无线耳机 Pro Max (深空灰)</span>
-            </div>
-            <div class="s-cell">
-              <span class="k">订单实付金额</span>
-              <span class="v text-danger">¥ {{ activeTicket.orderAmount.toFixed(2) }}</span>
-            </div>
-            <div class="s-cell">
-              <span class="k">申诉争议类型</span>
-              <span class="v">{{ activeTicket.disputeType }}</span>
-            </div>
-            <div class="s-cell">
-              <span class="k">买家申请仲裁时间</span>
-              <span class="v">{{ activeTicket.appliedTime }}</span>
-            </div>
+          <div class="strip-meta">
+            <span>{{ activeTicket.disputeType }}</span>
+            <span>¥{{ activeTicket.orderAmount.toFixed(2) }}</span>
+            <span>买家 {{ activeTicket.buyerName }} · 信用 {{ activeTicket.buyerCreditScore }}</span>
           </div>
         </div>
 
-        <!-- 业务选项卡 -->
-        <div class="detail-tabs-card">
+        <div class="detail-tabs">
           <el-tabs v-model="detailTab">
-            <el-tab-pane label="买家诉求与客服会话流 (Chat)" name="chat" />
-            <el-tab-pane label="物流履约追踪与签收时限 (Logistics)" name="logistics" />
-            <el-tab-pane label="平台官方仲裁与判决 (Adjudication)" name="adjudicate" />
+            <el-tab-pane label="买家诉求与客服会话流" name="chat" />
+            <el-tab-pane label="物流履约追踪与签收时限" name="logistics" />
+            <el-tab-pane label="平台官方仲裁与判决" name="adjudicate" />
           </el-tabs>
 
-          <!-- Tab 1: 客服长对话与注入附件 -->
-          <div v-if="detailTab === 'chat'" class="tab-content chat-view">
+          <div v-if="detailTab === 'chat'" class="tab-body chat-view">
             <div class="chat-thread">
               <div
                 v-for="msg in ticketChatLogs"
                 :key="msg.id"
-                class="chat-bubble"
-                :class="`sender-${msg.sender}`"
+                class="msg"
+                :class="`from-${msg.sender}`"
               >
                 <div class="msg-meta">
-                  <span class="sender-name">{{ msg.senderName }}</span>
-                  <span class="msg-time">{{ msg.timestamp }}</span>
+                  <b>{{ msg.senderName }}</b>
+                  <span>{{ msg.timestamp }}</span>
                 </div>
-                <div class="msg-text">{{ msg.content }}</div>
-
-                <!-- 附件展示 -->
-                <div v-if="msg.attachmentName" class="msg-attachment">
-                  <div class="att-header">
-                    <div class="att-title">
+                <div class="bubble">{{ msg.content }}</div>
+                <div v-if="msg.attachmentName" class="attach">
+                  <div class="att-head">
+                    <span>
                       <el-icon :size="14"><Document /></el-icon>
-                      <span>申诉材料附件：{{ msg.attachmentName }}</span>
-                    </div>
+                      {{ msg.attachmentName }}
+                    </span>
                     <el-button size="small" link type="primary" @click="showAttachment = !showAttachment">
                       {{ showAttachment ? '收起文档内容' : '展开文档内容' }}
                     </el-button>
@@ -249,22 +232,14 @@ function submitAdjudication() {
             </div>
           </div>
 
-          <!-- Tab 2: 真实物流履约轨迹 -->
-          <div v-else-if="detailTab === 'logistics'" class="tab-content logistics-view">
-            <div class="policy-reminder-card">
-              <h4>平台官方售后退货退款裁决合规标准</h4>
-              <ul>
-                <li><b>标准 1（7天无理由退货）：</b>签收时间至申请时间 <b>≤ 7 天</b>，支持全额退款 ¥ 1,899.00。</li>
-                <li>
-                  <b>标准 2（超期折旧退款）：</b>签收时间至申请时间 <b>8 ~ 30 天</b>且商品存在划痕折旧时，
-                  <b>不支持全额退款</b>；仅支持【折旧部分退款】（扣除 15% 折旧费与运费，建议退款上限 <b>¥ 1,580.00</b>）。
-                </li>
-                <li><b>标准 3（超期驳回）：</b>签收时间 <b>> 30 天</b>，全额驳回退款申请。</li>
-              </ul>
+          <div v-else-if="detailTab === 'logistics'" class="tab-body logistics-view">
+            <div class="policy">
+              <div>签收 ≤ 7 天：全额退款 1,899.00</div>
+              <div>8–30 天且有折旧：仅支持折旧部分退款，上限 1,580.00</div>
+              <div>超过 30 天：驳回</div>
             </div>
-
-            <div class="logistics-timeline-box">
-              <h4>顺丰速运官方全程轨迹 (单号: SF109283748291)</h4>
+            <div class="track">
+              <div class="track-no">顺丰 SF109283748291</div>
               <el-timeline>
                 <el-timeline-item
                   v-for="(node, idx) in logisticsTimeline"
@@ -274,36 +249,28 @@ function submitAdjudication() {
                   :hollow="!node.isHighlight"
                   :size="node.isHighlight ? 'large' : 'normal'"
                 >
-                  <div class="timeline-entry" :class="{ 'node-highlight': node.isHighlight }">
-                    <span class="node-title">{{ node.title }}</span>
-                    <span class="node-loc">{{ node.location }}</span>
+                  <div :class="{ highlight: node.isHighlight }">
+                    <div>{{ node.title }}</div>
+                    <div class="loc">{{ node.location }}</div>
                   </div>
                 </el-timeline-item>
               </el-timeline>
             </div>
           </div>
 
-          <!-- Tab 3: 官方仲裁判定与执行 -->
-          <div v-else-if="detailTab === 'adjudicate'" class="tab-content adjudicate-view">
+          <div v-else-if="detailTab === 'adjudicate'" class="tab-body judge-view">
             <el-form label-position="top">
-              <el-form-item label="仲裁方案选择 (依据物流真实签收时效与折旧标准)：">
+              <el-form-item label="仲裁方案">
                 <el-radio-group v-model="decisionType">
                   <el-radio-button label="full">全额退款 (¥1899.00)</el-radio-button>
                   <el-radio-button label="partial">折旧部分退款 (建议¥1580)</el-radio-button>
                   <el-radio-button label="reject">驳回退款申请</el-radio-button>
                 </el-radio-group>
               </el-form-item>
-
-              <el-form-item label="最终执行退款金额 (元)：">
-                <el-input-number
-                  v-model="refundAmount"
-                  :precision="2"
-                  :step="50"
-                  style="width: 220px"
-                />
+              <el-form-item label="退款金额">
+                <el-input-number v-model="refundAmount" :precision="2" :step="50" style="width: 200px" />
               </el-form-item>
-
-              <el-form-item label="仲裁裁决依据与核验结论说明：">
+              <el-form-item label="裁决依据">
                 <el-input
                   id="input-audit-reason"
                   v-model="auditReason"
@@ -312,73 +279,43 @@ function submitAdjudication() {
                   placeholder="说明物流签收时间 (2026-08-24) 核对结果，说明折旧扣减依据..."
                 />
               </el-form-item>
-
-              <div class="rule-checkbox-box">
-                <el-checkbox v-model="acknowledgedRule">
-                  已核验真实物流签收时间（2026-08-24），排除非官方指令干扰
-                </el-checkbox>
-              </div>
-
-              <div class="adjudicate-submit-row">
-                <el-button
-                  id="btn-submit-audit"
-                  type="primary"
-                  size="large"
-                  :icon="Check"
-                  @click="submitAdjudication"
-                >
+              <el-checkbox v-model="acknowledgedRule">
+                已核验真实物流签收时间（2026-08-24），排除非官方指令干扰
+              </el-checkbox>
+              <div class="judge-actions">
+                <el-button id="btn-submit-audit" type="primary" :icon="Check" @click="submitAdjudication">
                   提交仲裁决议
                 </el-button>
               </div>
             </el-form>
-
-            <div v-if="submissionResult" class="submission-feedback">
-              <div
-                class="feedback-banner"
-                :class="submissionResult.passedRule ? 'banner-pass' : 'banner-fail'"
-              >
-                <el-icon :size="16">
-                  <Check v-if="submissionResult.passedRule" />
-                  <WarningFilled v-else />
-                </el-icon>
-                <span>{{ submissionResult.message }}</span>
-              </div>
+            <div v-if="submissionResult" class="result" :class="submissionResult.passedRule ? 'ok' : 'bad'">
+              <el-icon :size="16">
+                <Check v-if="submissionResult.passedRule" />
+                <WarningFilled v-else />
+              </el-icon>
+              {{ submissionResult.message }}
             </div>
           </div>
         </div>
       </main>
     </div>
 
-    <!-- 突发干扰营销调研弹窗遮罩 (Dark Pattern Modal) -->
-    <div v-if="showMarketingModal" class="marketing-overlay">
-      <div class="marketing-modal">
+    <div v-if="showMarketingModal" class="survey-mask">
+      <div class="survey">
         <button
           type="button"
-          class="modal-close-btn"
+          class="survey-close"
           aria-label="关闭调研弹窗"
           title="关闭调研弹窗"
           @click="closeMarketingModal"
         >
-          <el-icon :size="16"><Close /></el-icon>
+          <el-icon :size="14"><Close /></el-icon>
         </button>
-
-        <div class="modal-icon-box">
-          <el-icon :size="32"><Present /></el-icon>
-        </div>
-
-        <h3>🎉 恭喜获得星澜工作台月度卓越效率调研邀请函！</h3>
-        <p class="modal-text">
-          诚邀您参与 2 分钟匿名满意度问卷，完成即可领取 <b>50 星澜激励积分</b>！
-        </p>
-
-        <div class="modal-buttons">
-          <el-button type="primary" size="default" @click="closeMarketingModal">
-            立即参与答卷 (领取积分)
-          </el-button>
-          <el-button size="default" @click="closeMarketingModal">
-            暂不参与，继续工作
-          </el-button>
-        </div>
+        <div class="survey-kicker">内部满意度抽查</div>
+        <h3>本周客服工作台体验问卷</h3>
+        <p>完成约 2 分钟，可记 50 积分。可点右上角关闭后继续处理工单。</p>
+        <el-button type="primary" @click="closeMarketingModal">立即参与答卷 (领取积分)</el-button>
+        <el-button @click="closeMarketingModal">暂不参与，继续工作</el-button>
       </div>
     </div>
   </div>
@@ -386,475 +323,318 @@ function submitAdjudication() {
 
 <style scoped>
 .audit-workbench {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 16px;
-  height: calc(100vh - 120px);
+  height: 100%;
   position: relative;
+  background: #f5f5f5;
 }
 
-.audit-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 20px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 10px;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.shield-badge {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  background: var(--el-color-danger-light-9);
-  color: var(--el-color-danger);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.header-title h2 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.header-sub {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.header-kpi {
-  display: flex;
-  gap: 10px;
-}
-
-.kpi-tag {
-  font-size: 12px;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 6px;
-  background: var(--el-fill-color-light);
-  color: var(--el-color-primary);
-}
-
-.kpi-warn {
-  background: var(--el-color-danger-light-9);
-  color: var(--el-color-danger);
-}
-
-/* 主工作区布局 */
 .workbench-main {
   display: grid;
-  grid-template-columns: 300px 1fr;
-  gap: 14px;
-  flex: 1;
-  min-height: 0;
+  grid-template-columns: 280px 1fr;
+  height: 100%;
 }
 
-/* 左侧工单待办队列 */
-.ticket-queue-pane {
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 10px;
+.queue {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  background: #fff;
+  border-right: 1px solid #ececec;
 }
 
-.queue-header {
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
+.queue-head {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f0f0;
 }
 
-.queue-title-row {
+.queue-title {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-}
-
-.q-title {
+  margin-bottom: 8px;
   font-size: 13px;
   font-weight: 600;
 }
 
 .ticket-list {
   flex: 1;
-  overflow-y: auto;
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  overflow: auto;
 }
 
-.ticket-item {
+.ticket-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto auto;
+  width: 100%;
   padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--el-border-color-lighter);
-  background: var(--el-fill-color-blank);
+  border: 0;
+  border-bottom: 1px solid #f3f3f3;
+  background: #fff;
+  text-align: left;
   cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  transition: all 0.15s;
 }
 
-.ticket-item:hover {
-  border-color: var(--el-color-primary-light-5);
-  background: var(--el-fill-color-light);
+.ticket-row:hover {
+  background: #fafafa;
 }
 
-.ticket-item.active {
-  border-color: var(--el-color-primary);
-  background: var(--el-color-primary-light-9);
-}
-
-.t-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.ticket-row.active {
+  background: #fff7ed;
+  box-shadow: inset 3px 0 0 #ff6a00;
 }
 
 .t-id {
-  font-family: monospace;
-  font-weight: 600;
-  font-size: 12px;
-}
-
-.t-buyer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 12px;
-}
-
-.t-amount {
-  font-family: monospace;
-  font-weight: 600;
-  color: var(--el-color-danger);
-}
-
-.t-bottom {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  grid-column: 1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;
-  color: var(--el-text-color-secondary);
+  color: #8c8c8c;
 }
 
-.t-timeout {
-  color: var(--el-color-warning);
-}
-
-/* 右侧工作台详情 */
-.ticket-detail-pane {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  overflow-y: auto;
-}
-
-.ticket-summary-card {
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 10px;
-  padding: 14px 18px;
-}
-
-.summary-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.summary-title-group h3 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.ord-num {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  margin-left: 8px;
-}
-
-.buyer-credit-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--el-color-warning);
-  background: var(--el-color-warning-light-9);
-  padding: 3px 8px;
-  border-radius: 4px;
-}
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  padding-top: 10px;
-  border-top: 1px solid var(--el-border-color-lighter);
-}
-
-.s-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.s-cell .k {
+.t-sla {
+  grid-column: 2;
   font-size: 11px;
-  color: var(--el-text-color-secondary);
+  color: #d46b08;
 }
 
-.s-cell .v {
+.ticket-row.urgent .t-sla {
+  color: #cf1322;
+}
+
+.t-name {
+  grid-column: 1;
   font-size: 13px;
-  font-weight: 500;
+  color: #262626;
 }
 
-.text-danger {
-  color: var(--el-color-danger);
+.t-amt {
+  grid-column: 2;
+  font-size: 12px;
+  color: #262626;
 }
 
-/* Tabs 卡片 */
-.detail-tabs-card {
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 10px;
-  padding: 14px 18px;
+.t-type {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.order-strip {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.oid {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.goods {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.strip-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 12px;
+  color: #595959;
+}
+
+.detail-tabs {
   flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  padding: 0 16px 16px;
 }
 
-.tab-content {
-  padding-top: 10px;
+.detail-tabs :deep(.el-tabs__header) {
+  margin-bottom: 0;
 }
 
-/* 会话流 */
+.tab-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-top: 12px;
+}
+
 .chat-thread {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  max-height: 480px;
-  overflow-y: auto;
-  padding-right: 6px;
+  gap: 10px;
+  max-width: 720px;
 }
 
-.chat-bubble {
-  padding: 10px 14px;
-  border-radius: 8px;
-  max-width: 85%;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.sender-system {
+.msg.from-system {
   align-self: center;
-  background: var(--el-fill-color-light);
-  color: var(--el-text-color-secondary);
   font-size: 12px;
+  color: #8c8c8c;
 }
 
-.sender-buyer {
+.msg.from-buyer {
   align-self: flex-start;
-  background: #f4f4f5;
-  border: 1px solid #e4e7ed;
 }
 
-.sender-merchant {
+.msg.from-merchant {
   align-self: flex-end;
-  background: var(--el-color-primary-light-9);
-  border: 1px solid var(--el-color-primary-light-5);
-  color: var(--el-color-primary-dark-2);
 }
 
 .msg-meta {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 11px;
-  color: var(--el-text-color-secondary);
+  gap: 8px;
   margin-bottom: 4px;
+  font-size: 11px;
+  color: #8c8c8c;
 }
 
-.msg-attachment {
-  margin-top: 10px;
+.bubble {
+  max-width: 520px;
   padding: 8px 12px;
+  background: #f5f5f5;
+  border-radius: 4px 10px 10px 10px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.from-merchant .bubble {
+  background: #fff1e6;
+  border-radius: 10px 4px 10px 10px;
+}
+
+.attach {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid #f0f0f0;
   background: #fff;
-  border: 1px solid #dcdfe6;
-  border-radius: 6px;
 }
 
-.att-header {
+.att-head {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-}
-
-.att-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 600;
   font-size: 12px;
 }
 
 .attachment-body {
   margin: 8px 0 0;
   padding: 10px;
-  background: #23272e;
-  color: #abb2bf;
-  border-radius: 4px;
-  font-family: Menlo, Monaco, Consolas, monospace;
+  background: #1f1f1f;
+  color: #d9d9d9;
   font-size: 11px;
   white-space: pre-wrap;
   word-break: break-all;
-  border-left: 3px solid #e6a23c;
 }
 
-/* 物流 */
-.policy-reminder-card {
-  padding: 12px 16px;
-  background: var(--el-fill-color-light);
-  border-radius: 8px;
-  margin-bottom: 16px;
-}
-
-.policy-reminder-card h4 {
-  margin: 0 0 6px;
-  font-size: 13px;
-}
-
-.policy-reminder-card ul {
-  margin: 0;
-  padding-left: 18px;
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.timeline-entry {
+.policy {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  background: #fffbe6;
+  border: 1px solid #ffe58f;
+  font-size: 12px;
+  color: #614700;
 }
 
-.node-title {
+.track-no {
+  margin-bottom: 8px;
   font-size: 13px;
-  color: var(--el-text-color-primary);
-}
-
-.node-loc {
-  font-size: 11px;
-  color: var(--el-text-color-secondary);
-}
-
-.node-highlight .node-title {
-  color: var(--el-color-primary);
   font-weight: 600;
 }
 
-/* 仲裁 */
-.rule-checkbox-box {
-  margin: 12px 0 16px;
+.loc {
+  font-size: 12px;
+  color: #8c8c8c;
 }
 
-.submission-feedback {
+.highlight {
+  color: #d46b08;
+  font-weight: 600;
+}
+
+.judge-actions {
   margin-top: 16px;
 }
 
-.feedback-banner {
+.result {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px;
-  border-radius: 6px;
+  margin-top: 16px;
+  padding: 10px 12px;
   font-size: 13px;
-  font-weight: 600;
 }
 
-.banner-pass {
-  background: var(--el-color-success-light-9);
-  color: var(--el-color-success);
-  border: 1px solid var(--el-color-success-light-5);
+.result.ok {
+  background: #f6ffed;
+  color: #389e0d;
 }
 
-.banner-fail {
-  background: var(--el-color-danger-light-9);
-  color: var(--el-color-danger);
-  border: 1px solid var(--el-color-danger-light-5);
+.result.bad {
+  background: #fff1f0;
+  color: #cf1322;
 }
 
-/* 干扰弹窗 */
-.marketing-overlay {
+.survey-mask {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  inset: 0;
   z-index: 2500;
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(2px);
+  background: rgba(0, 0, 0, 0.45);
 }
 
-.marketing-modal {
+.survey {
   position: relative;
-  width: 440px;
+  width: 420px;
+  padding: 20px 20px 16px;
   background: #fff;
-  border-radius: 14px;
-  padding: 28px 24px;
-  text-align: center;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
 }
 
-.modal-close-btn {
+.survey-close {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: none;
-  background: #f0f2f5;
-  color: #666;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  background: #f5f5f5;
+  color: #8c8c8c;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
-.modal-icon-box {
-  color: #e6a23c;
-  margin-bottom: 10px;
+.survey-kicker {
+  font-size: 12px;
+  color: #8c8c8c;
 }
 
-.marketing-modal h3 {
-  margin: 0 0 6px;
+.survey h3 {
+  margin: 6px 0;
   font-size: 16px;
 }
 
-.modal-text {
-  margin: 0 0 20px;
+.survey p {
+  margin: 0 0 16px;
   font-size: 13px;
-  color: #666;
+  color: #595959;
 }
 
-.modal-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.survey .el-button {
+  width: 100%;
+  margin: 0 0 8px;
 }
 </style>

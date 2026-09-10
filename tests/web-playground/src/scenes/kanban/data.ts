@@ -3,7 +3,7 @@ import type { KanbanColumn } from './types'
 export const initialKanbanColumns: KanbanColumn[] = [
   {
     id: 'backlog',
-    title: '需求规划池',
+    title: '规划',
     cards: [
       {
         id: 'TASK-1011',
@@ -100,7 +100,7 @@ export const initialKanbanColumns: KanbanColumn[] = [
   },
   {
     id: 'in_progress',
-    title: '正在开发中',
+    title: '开发中',
     cards: [
       {
         id: 'TASK-1082',
@@ -197,7 +197,7 @@ export const initialKanbanColumns: KanbanColumn[] = [
   },
   {
     id: 'testing',
-    title: '联调与测试',
+    title: '联调',
     cards: [
       {
         id: 'TASK-1033',
@@ -281,7 +281,7 @@ export const initialKanbanColumns: KanbanColumn[] = [
   },
   {
     id: 'acceptance',
-    title: '产品待验收',
+    title: '待验收',
     cards: [
       {
         id: 'TASK-1020',
@@ -352,7 +352,7 @@ export const initialKanbanColumns: KanbanColumn[] = [
   },
   {
     id: 'released',
-    title: '线上已发布',
+    title: '已发布',
     cards: [
       {
         id: 'TASK-0980',

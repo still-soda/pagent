@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useSceneOracle } from '../../oracle'
+import { PAGE1_EXPECTATIONS, verifyReconcile } from './verify'
 import {
   Check,
   Close,
@@ -87,6 +89,9 @@ function openBankTab() {
 }
 
 /* ---------- 批量提交 ---------- */
+const page1Submitted = ref(false)
+const page1Ids = PAGE1_EXPECTATIONS.map((item) => item.id)
+
 function submitCurrentPage() {
   const unreviewed = paginatedClaims.value.filter((c) => c.status === 'pending')
   if (unreviewed.length > 0) {
@@ -94,8 +99,33 @@ function submitCurrentPage() {
     return
   }
 
+  if (page1Ids.every((id) => paginatedClaims.value.some((claim) => claim.id === id))) {
+    page1Submitted.value = true
+  }
+
   ElMessage.success(`第 ${currentPage.value} 页对账结果已成功批量归档！`)
 }
+
+function resetReconcile() {
+  claims.splice(0, claims.length, ...JSON.parse(JSON.stringify(mockClaims)))
+  statusFilter.value = 'all'
+  departmentFilter.value = 'all'
+  searchKeyword.value = ''
+  currentPage.value = 1
+  splitViewOpen.value = false
+  discrepancyDialogVisible.value = false
+  activeDiscrepancyItem.value = null
+  page1Submitted.value = false
+}
+
+useSceneOracle('reconcile', {
+  verify: () =>
+    verifyReconcile({
+      claims,
+      page1Submitted: page1Submitted.value,
+    }),
+  reset: resetReconcile,
+})
 
 function statusTag(status: ClaimStatus) {
   switch (status) {
@@ -110,213 +140,136 @@ function statusTag(status: ClaimStatus) {
 
 <template>
   <div class="reconcile-workbench" :class="{ 'with-split': splitViewOpen }">
-    <!-- 主界面：ERP 报销审核台 -->
     <div class="erp-container">
-      <header class="erp-header-card">
-        <div class="header-left">
-          <div class="header-icon-box">
-            <el-icon :size="20"><DocumentChecked /></el-icon>
-          </div>
-          <div class="header-title-box">
-            <h2>星澜企业 ERP · 费用报销对账稽核台</h2>
-            <span class="header-desc">
-              对比招商银行对公账户交易流水，逐笔核验单据申报金额与流水号一致性（共 {{ claims.length }} 笔）
-            </span>
-          </div>
-        </div>
-
-        <div class="header-actions">
-          <el-button
-            id="btn-open-bank-tab"
-            type="primary"
-            :icon="TopRight"
-            @click="openBankTab"
-          >
-            在新标签页打开银行流水台
-          </el-button>
-          <el-switch
-            v-model="splitViewOpen"
-            active-text="分屏比对视窗"
-            inactive-text="单屏"
-          />
+      <header class="erp-top">
+        <div class="crumb">
+          <el-icon :size="14"><DocumentChecked /></el-icon>
+          财务中心 / 费用报销 / 银行对账
         </div>
       </header>
 
-      <!-- KPI 统计条 -->
-      <div class="kpi-grid">
-        <div class="kpi-card">
-          <span class="lbl">全量费用报销工单</span>
-          <span class="val">{{ claims.length }} 笔</span>
-        </div>
-        <div class="kpi-card">
-          <span class="lbl">待核验待办单据</span>
-          <span class="val text-primary">{{ claims.filter(c => c.status === 'pending').length }} 笔</span>
-        </div>
-        <div class="kpi-card">
-          <span class="lbl">已识别金额差异</span>
-          <span class="val text-danger">{{ claims.filter(c => c.status === 'discrepancy').length }} 笔</span>
-        </div>
-        <div class="kpi-card">
-          <span class="lbl">流水缺失报警</span>
-          <span class="val text-warning">{{ claims.filter(c => c.status === 'missing').length }} 笔</span>
-        </div>
+      <div class="period-bar">
+        <span>账期 2026-09</span>
+        <span>批次 第一批</span>
+        <span>共 {{ claims.length }} 笔</span>
+        <span>待核验 {{ claims.filter((c) => c.status === 'pending').length }}</span>
+        <span class="warn">金额异常 {{ claims.filter((c) => c.status === 'discrepancy').length }}</span>
+        <span class="warn">流水缺失 {{ claims.filter((c) => c.status === 'missing').length }}</span>
       </div>
 
-      <!-- 筛选工具栏 -->
       <div class="filter-toolbar">
-        <div class="filter-group">
-          <span class="f-lbl">状态流转：</span>
-          <el-radio-group v-model="statusFilter" size="small">
-            <el-radio-button label="all">全部 ({{ claims.length }})</el-radio-button>
-            <el-radio-button label="pending">待核验</el-radio-button>
-            <el-radio-button label="matched">已通过</el-radio-button>
-            <el-radio-button label="discrepancy">金额异常</el-radio-button>
-            <el-radio-button label="missing">流水缺失</el-radio-button>
-          </el-radio-group>
-        </div>
-
-        <div class="filter-group">
-          <span class="f-lbl">所属部门：</span>
-          <el-select v-model="departmentFilter" size="small" style="width: 140px">
-            <el-option label="全部部门" value="all" />
-            <el-option label="技术研发部" value="技术研发部" />
-            <el-option label="市场公关部" value="市场公关部" />
-            <el-option label="产品设计部" value="产品设计部" />
-            <el-option label="商业化团队" value="商业化团队" />
-            <el-option label="综合行政部" value="综合行政部" />
-          </el-select>
-
-          <el-input
-            v-model="searchKeyword"
-            placeholder="搜索单号/申请人/流水号..."
-            :prefix-icon="Search"
-            size="small"
-            clearable
-            style="width: 200px"
-          />
-        </div>
+        <el-radio-group v-model="statusFilter" size="small">
+          <el-radio-button label="all">全部</el-radio-button>
+          <el-radio-button label="pending">待核验</el-radio-button>
+          <el-radio-button label="matched">已通过</el-radio-button>
+          <el-radio-button label="discrepancy">金额异常</el-radio-button>
+          <el-radio-button label="missing">流水缺失</el-radio-button>
+        </el-radio-group>
+        <el-select v-model="departmentFilter" size="small" style="width: 132px">
+          <el-option label="全部部门" value="all" />
+          <el-option label="技术研发部" value="技术研发部" />
+          <el-option label="市场公关部" value="市场公关部" />
+          <el-option label="产品设计部" value="产品设计部" />
+          <el-option label="商业化团队" value="商业化团队" />
+          <el-option label="综合行政部" value="综合行政部" />
+        </el-select>
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索单号/申请人/流水号..."
+          :prefix-icon="Search"
+          size="small"
+          clearable
+          style="width: 200px"
+        />
+        <el-button id="btn-open-bank-tab" type="primary" size="small" :icon="TopRight" @click="openBankTab">
+          在新标签页打开银行流水台
+        </el-button>
+        <el-switch v-model="splitViewOpen" active-text="分屏" inactive-text="单屏" />
       </div>
 
-      <!-- 报销单主表格 -->
-      <div class="table-card">
-        <el-table :data="paginatedClaims" stripe border style="width: 100%">
-          <el-table-column prop="id" label="报销单号" width="135">
+      <div class="table-wrap">
+        <el-table :data="paginatedClaims" border size="small" style="width: 100%" height="100%">
+          <el-table-column prop="id" label="报销单号" width="128">
             <template #default="{ row }">
-              <span class="code-font">{{ row.id }}</span>
+              <span class="code">{{ row.id }}</span>
             </template>
           </el-table-column>
-
-          <el-table-column prop="applicant" label="申请人" width="95" />
-          <el-table-column prop="department" label="所属部门" width="120" />
-          <el-table-column prop="reason" label="报销事由" min-width="170" />
-
-          <el-table-column prop="invoiceNo" label="发票凭据号" width="150">
+          <el-table-column prop="applicant" label="申请人" width="84" />
+          <el-table-column prop="department" label="部门" width="110" />
+          <el-table-column prop="reason" label="事由" min-width="160" />
+          <el-table-column prop="invoiceNo" label="发票号" width="150">
             <template #default="{ row }">
-              <span class="code-font text-muted">{{ row.invoiceNo }}</span>
+              <span class="code muted">{{ row.invoiceNo }}</span>
             </template>
           </el-table-column>
-
-          <el-table-column prop="txnId" label="关联银行流水号" width="135">
+          <el-table-column prop="txnId" label="银行流水号" width="120">
             <template #default="{ row }">
-              <span class="code-font text-primary">{{ row.txnId }}</span>
+              <span class="code txn">{{ row.txnId }}</span>
             </template>
           </el-table-column>
-
-          <el-table-column prop="claimAmount" label="申报金额" width="115" align="right">
+          <el-table-column prop="claimAmount" label="申报金额" width="110" align="right">
             <template #default="{ row }">
-              <span class="amount-val">¥ {{ row.claimAmount.toFixed(2) }}</span>
+              <span class="amt">{{ row.claimAmount.toFixed(2) }}</span>
             </template>
           </el-table-column>
-
-          <el-table-column prop="status" label="对账状态" width="105" align="center">
+          <el-table-column prop="status" label="状态" width="92" align="center">
             <template #default="{ row }">
               <el-tag :type="statusTag(row.status).type" size="small">
                 {{ statusTag(row.status).text }}
               </el-tag>
             </template>
           </el-table-column>
-
-          <el-table-column prop="actualAmount" label="流水实付" width="115" align="right">
+          <el-table-column prop="actualAmount" label="流水实付" width="110" align="right">
             <template #default="{ row }">
-              <span v-if="row.actualAmount !== null" class="amount-val" :class="{ 'text-danger': row.status === 'discrepancy' }">
-                ¥ {{ row.actualAmount.toFixed(2) }}
+              <span v-if="row.actualAmount !== null" class="amt" :class="{ danger: row.status === 'discrepancy' }">
+                {{ row.actualAmount.toFixed(2) }}
               </span>
-              <span v-else class="text-muted">-</span>
+              <span v-else class="muted">-</span>
             </template>
           </el-table-column>
-
-          <el-table-column prop="reviewNote" label="核验备注 / 差异原因" min-width="190">
+          <el-table-column prop="reviewNote" label="核验备注" min-width="180">
             <template #default="{ row }">
-              <span class="note-text">{{ row.reviewNote || '—' }}</span>
+              <span class="note">{{ row.reviewNote || '—' }}</span>
             </template>
           </el-table-column>
-
-          <el-table-column label="操作" width="220" fixed="right">
+          <el-table-column label="操作" width="200" fixed="right">
             <template #default="{ row }">
-              <div class="row-actions">
-                <el-button
-                  type="success"
-                  link
-                  size="small"
-                  :disabled="row.status === 'matched'"
-                  @click="markMatched(row)"
-                >
-                  通过
-                </el-button>
-                <el-button
-                  type="danger"
-                  link
-                  size="small"
-                  @click="openDiscrepancyDialog(row)"
-                >
-                  标记异常
-                </el-button>
-                <el-button
-                  type="warning"
-                  link
-                  size="small"
-                  :disabled="row.status === 'missing'"
-                  @click="markMissing(row)"
-                >
-                  流水缺失
-                </el-button>
-              </div>
+              <el-button type="success" link size="small" :disabled="row.status === 'matched'" @click="markMatched(row)">
+                通过
+              </el-button>
+              <el-button type="danger" link size="small" @click="openDiscrepancyDialog(row)">
+                标记异常
+              </el-button>
+              <el-button type="warning" link size="small" :disabled="row.status === 'missing'" @click="markMissing(row)">
+                流水缺失
+              </el-button>
             </template>
           </el-table-column>
         </el-table>
+      </div>
 
-        <div class="table-footer">
-          <el-pagination
-            v-model:current-page="currentPage"
-            :page-size="pageSize"
-            :total="filteredClaims.length"
-            layout="prev, pager, next, total"
-          />
-
-          <div class="footer-actions">
-            <el-button
-              id="btn-submit-page"
-              type="primary"
-              :icon="Check"
-              @click="submitCurrentPage"
-            >
-              提交当页核销结果
-            </el-button>
-          </div>
-        </div>
+      <div class="table-footer">
+        <el-pagination
+          v-model:current-page="currentPage"
+          :page-size="pageSize"
+          :total="filteredClaims.length"
+          layout="prev, pager, next, total"
+          small
+        />
+        <el-button id="btn-submit-page" type="primary" size="small" :icon="Check" @click="submitCurrentPage">
+          提交当页核销结果
+        </el-button>
       </div>
     </div>
 
-    <!-- 分屏对比视窗 -->
     <div v-if="splitViewOpen" class="split-pane">
       <div class="split-header">
-        <span>对公账户银行流水实时对比视窗</span>
+        <span>招行对公流水</span>
         <el-button size="small" link :icon="Close" @click="splitViewOpen = false" />
       </div>
       <iframe src="/reconcile/statement" class="split-frame" title="Bank Statement Frame" />
     </div>
 
-    <!-- 异常记录弹窗 -->
     <el-dialog
       v-model="discrepancyDialogVisible"
       title="记录金额核对异常"
@@ -358,173 +311,118 @@ function statusTag(status: ClaimStatus) {
 
 <style scoped>
 .reconcile-workbench {
-  padding: 16px;
   display: flex;
-  gap: 16px;
-  height: calc(100vh - 120px);
-}
-
-.with-split .erp-container {
-  flex: 1;
-  min-width: 0;
+  height: 100%;
+  background: #eef1f6;
 }
 
 .erp-container {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  overflow-y: auto;
 }
 
-.erp-header-card {
+.erp-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 14px 20px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 10px;
+  height: 40px;
+  padding: 0 12px;
+  background: #1d4f91;
+  color: #fff;
+  font-size: 13px;
 }
 
-.header-left {
+.crumb {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
 }
 
-.header-icon-box {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  background: var(--el-color-primary-light-9);
-  color: var(--el-color-primary);
+.period-bar {
   display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.header-title-box h2 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.header-desc {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
   gap: 16px;
-}
-
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-}
-
-.kpi-card {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px 16px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-}
-
-.kpi-card .lbl {
+  padding: 6px 12px;
+  background: #f7f8fa;
+  border-bottom: 1px solid #d9dee8;
   font-size: 12px;
-  color: var(--el-text-color-secondary);
+  color: #4b5563;
 }
 
-.kpi-card .val {
-  font-size: 18px;
-  font-weight: 600;
+.period-bar .warn {
+  color: #b45309;
 }
 
 .filter-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-}
-
-.filter-group {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.f-lbl {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.table-card {
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 10px;
-  padding: 16px;
-}
-
-.code-font {
-  font-family: monospace;
-  font-weight: 600;
-}
-
-.amount-val {
-  font-family: monospace;
-  font-weight: 600;
-}
-
-.note-text {
-  font-size: 12px;
-  color: var(--el-text-color-regular);
-}
-
-.row-actions {
-  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+  padding: 8px 12px;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.table-wrap {
+  flex: 1;
+  min-height: 0;
+  background: #fff;
+}
+
+.code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.txn {
+  color: #1d4f91;
+}
+
+.amt {
+  font-variant-numeric: tabular-nums;
+}
+
+.amt.danger,
+.danger {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.muted {
+  color: #9ca3af;
+}
+
+.note {
+  font-size: 12px;
+  color: #4b5563;
 }
 
 .table-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--el-border-color-lighter);
+  padding: 8px 12px;
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
 }
 
 .split-pane {
-  width: 48%;
-  background: #fff;
-  border: 1px solid var(--el-border-color);
-  border-radius: 10px;
+  width: 46%;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  box-shadow: var(--el-box-shadow-light);
+  border-left: 1px solid #cfd6e4;
+  background: #fff;
 }
 
 .split-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 14px;
-  background: #fafafa;
-  border-bottom: 1px solid #ebeef5;
-  font-size: 13px;
-  font-weight: 600;
+  height: 36px;
+  padding: 0 12px;
+  background: #f7f8fa;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 12px;
 }
 
 .split-frame {

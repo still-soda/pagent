@@ -1,9 +1,5 @@
 import { Notebook } from '@element-plus/icons-vue'
 import type { PlaygroundScene } from '../index'
-import KbArticlePage from './pages/KbArticlePage.vue'
-import KbHome from './pages/KbHome.vue'
-import KbWritePage from './pages/KbWritePage.vue'
-import KbLayout from './layout/KbLayout.vue'
 
 export const knowledgeBaseScene: PlaygroundScene = {
   id: 'knowledge-base',
@@ -18,20 +14,20 @@ export const knowledgeBaseScene: PlaygroundScene = {
     '为文档添加至少 2 个标签，保存并确认文档出现在「我的文档」列表中。',
   ],
   icon: Notebook,
-  component: KbLayout,
+  component: () => import('./layout/KbLayout.vue'),
   routes: [
     {
       path: '/knowledge-base',
-      component: KbLayout,
+      component: () => import('./layout/KbLayout.vue'),
       meta: { sceneId: 'knowledge-base' },
       children: [
-        { path: '', name: 'knowledge-base', component: KbHome },
+        { path: '', name: 'knowledge-base', component: () => import('./pages/KbHome.vue') },
         {
           path: 'articles/:slug',
           name: 'knowledge-base-article',
-          component: KbArticlePage,
+          component: () => import('./pages/KbArticlePage.vue'),
         },
-        { path: 'write', name: 'knowledge-base-write', component: KbWritePage },
+        { path: 'write', name: 'knowledge-base-write', component: () => import('./pages/KbWritePage.vue') },
       ],
     },
   ],

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useSceneOracle } from '../oracle'
+import { verifyPreferences } from './preferences-verify'
 import {
   ArrowDown,
   ArrowRight,
@@ -113,12 +115,13 @@ interface DeviceEntry {
   time: string
   current: boolean
 }
-const devices = ref<DeviceEntry[]>([
+const initialDevices: DeviceEntry[] = [
   { id: 1, name: 'MacBook Air · Chrome 126', location: '上海', time: '当前会话', current: true },
   { id: 2, name: 'iPhone 15 · Safari', location: '上海', time: '2 小时前', current: false },
   { id: 3, name: 'Windows 11 · Edge', location: '北京', time: '昨天 21:40', current: false },
   { id: 4, name: 'iPad Air · Chrome', location: '杭州', time: '09-01 10:12', current: false },
-])
+]
+const devices = ref<DeviceEntry[]>(initialDevices.map((device) => ({ ...device })))
 function offline(id: number) {
   devices.value = devices.value.filter((device) => device.id !== id)
   ElMessage.success('设备已下线')
@@ -145,6 +148,10 @@ function pickSuggestion(value: string) {
 
 const riskAgreed = ref(false)
 const labEnabled = ref(false)
+const labToggles = reactive({
+  autoSummary: false,
+  shortcutPanel: false,
+})
 
 function enableLab() {
   labEnabled.value = true
@@ -207,9 +214,63 @@ onMounted(() => {
 
 onBeforeUnmount(() => logObserver?.disconnect())
 
+const preferencesSaved = ref(false)
+
 function savePreferences() {
+  preferencesSaved.value = true
   ElMessage.success('偏好已保存')
 }
+
+function resetPreferences() {
+  language.value = '简体中文'
+  theme.value = '浅色'
+  timezonePanelOpen.value = false
+  timezone.value = 'GMT+8 北京'
+  pop.kind = ''
+  notifyPrefs.product = true
+  notifyPrefs.marketing = false
+  notifyPrefs.weekly = true
+  advancedOpen.value = false
+  quietStart.value = '22:00'
+  quietEnd.value = '08:00'
+  digestDay.value = '每周五'
+  code.value = ''
+  verifying.value = false
+  verifyState.value = 'idle'
+  countdown.value = 0
+  if (countdownTimer) window.clearInterval(countdownTimer)
+  devices.value = initialDevices.map((device) => ({ ...device }))
+  keyword.value = ''
+  riskAgreed.value = false
+  labEnabled.value = false
+  labToggles.autoSummary = false
+  labToggles.shortcutPanel = false
+  logPage.value = 1
+  logs.value = logPool.slice(0, PAGE_SIZE)
+  preferencesSaved.value = false
+}
+
+useSceneOracle('preferences', {
+  verify: () =>
+    verifyPreferences({
+      language: language.value,
+      theme: theme.value,
+      timezone: timezone.value,
+      notifyProduct: notifyPrefs.product,
+      notifyMarketing: notifyPrefs.marketing,
+      notifyWeekly: notifyPrefs.weekly,
+      quietStart: quietStart.value,
+      quietEnd: quietEnd.value,
+      digestDay: digestDay.value,
+      verifyState: verifyState.value,
+      deviceLocations: devices.value.map((device) => device.location),
+      labEnabled: labEnabled.value,
+      autoSummary: labToggles.autoSummary,
+      saved: preferencesSaved.value,
+      logTimes: logs.value.map((entry) => entry.time),
+    }),
+  reset: resetPreferences,
+})
 </script>
 
 <template>
@@ -426,12 +487,12 @@ function savePreferences() {
       <div v-show="labEnabled" class="lab-panel">
         <div class="switch-list">
           <label class="switch">
-            <input type="checkbox" class="switch-input" />
+            <input v-model="labToggles.autoSummary" type="checkbox" class="switch-input" />
             <span class="switch-track"></span>
             <span class="switch-text"><span class="switch-name">自动摘要</span></span>
           </label>
           <label class="switch">
-            <input type="checkbox" class="switch-input" />
+            <input v-model="labToggles.shortcutPanel" type="checkbox" class="switch-input" />
             <span class="switch-track"></span>
             <span class="switch-text"><span class="switch-name">快捷指令面板</span></span>
           </label>
