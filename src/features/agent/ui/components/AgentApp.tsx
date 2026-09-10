@@ -11,12 +11,16 @@ import {
   notePagentInteraction,
 } from '@/features/page/selection';
 import {
+  clampFabPosition,
   clampPanelPosition,
   clampPanelWidth,
+  collapsedPosition,
+  FAB_DRAG_THRESHOLD,
   isPanelDragTarget,
   loadPanelPosition,
   loadPanelWidth,
   nextPanelResize,
+  panelPositionFromFab,
   panelSize,
   savePanelLayout,
   type PanelPosition,
@@ -46,7 +50,19 @@ export function AgentApp({
   const panelRef = useRef<HTMLDivElement>(null);
   const fabRef = useRef<HTMLButtonElement>(null);
   const fabFrameRef = useRef<number | undefined>(undefined);
-  const dragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
+  const skipFabClickRef = useRef(false);
+  const dragRef = useRef<
+    | { kind: 'panel'; offsetX: number; offsetY: number }
+    | {
+        kind: 'fab';
+        offsetX: number;
+        offsetY: number;
+        startX: number;
+        startY: number;
+        moved: boolean;
+      }
+    | null
+  >(null);
   const resizeRef = useRef<{
     edge: PanelResizeEdge;
     pointerX: number;
@@ -134,7 +150,7 @@ export function AgentApp({
 
   useEffect(() => {
     const fab = fabRef.current;
-    if (open || session.agentActive) {
+    if (open || session.agentActive || manipulating) {
       fab?.style.setProperty('--fab-look-x', '0');
       fab?.style.setProperty('--fab-look-y', '0');
       return;
@@ -165,7 +181,7 @@ export function AgentApp({
       window.removeEventListener('pointermove', onMove);
       if (fabFrameRef.current) cancelAnimationFrame(fabFrameRef.current);
     };
-  }, [open, session.agentActive]);
+  }, [open, session.agentActive, manipulating]);
 
   // 工作结束时：让右下角圆形按钮水平翻转庆祝一次
   useEffect(() => {
@@ -194,10 +210,10 @@ export function AgentApp({
   useLayoutEffect(() => {
     const clampToViewport = () => {
       const nextWidth = clampPanelWidth(widthRef.current);
-      const next = clampPanelPosition(
-        positionRef.current,
-        panelSize(nextWidth),
-      );
+      const size = panelSize(nextWidth);
+      const next = open
+        ? clampPanelPosition(positionRef.current, size)
+        : panelPositionFromFab(clampFabPosition(collapsedPosition(positionRef.current, size)), size);
       updateWidth(nextWidth);
       updatePosition(next);
       savePanelLayout(next, nextWidth);
@@ -224,6 +240,23 @@ export function AgentApp({
       }
       const drag = dragRef.current;
       if (!drag) return;
+      if (drag.kind === 'fab') {
+        const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
+        if (!drag.moved && distance < FAB_DRAG_THRESHOLD) return;
+        if (!drag.moved) {
+          drag.moved = true;
+          skipFabClickRef.current = true;
+          setManipulating(true);
+        }
+        event.preventDefault();
+        const size = panelSize(widthRef.current);
+        const fab = clampFabPosition({
+          x: event.clientX - drag.offsetX,
+          y: event.clientY - drag.offsetY,
+        });
+        updatePosition(panelPositionFromFab(fab, size));
+        return;
+      }
       const size = panelRef.current?.getBoundingClientRect();
       updatePosition(
         clampPanelPosition(
@@ -255,10 +288,26 @@ export function AgentApp({
     if (!rect) return;
     event.preventDefault();
     dragRef.current = {
+      kind: 'panel',
       offsetX: event.clientX - rect.left,
       offsetY: event.clientY - rect.top,
     };
     setManipulating(true);
+  };
+
+  const onFabPointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0 || open) return;
+    const rect = panelRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    skipFabClickRef.current = false;
+    dragRef.current = {
+      kind: 'fab',
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false,
+    };
   };
 
   const onResizePointerDown = (edge: PanelResizeEdge) => (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -275,11 +324,8 @@ export function AgentApp({
     setManipulating(true);
   };
 
-  const closedPosition = {
-    x: Math.max(20, window.innerWidth - 76),
-    y: Math.max(20, window.innerHeight - 76),
-  };
   const height = panelSize(width).height;
+  const closedPosition = collapsedPosition(position, { width, height });
 
   const markScreen = async () => {
     if (capturingScreen) return;
@@ -458,7 +504,14 @@ export function AgentApp({
             className={`pagent-fab ${
               session.agentActive ? 'is-working' : ''
             } ${!session.agentActive ? 'is-idle' : ''} ${celebrating ? 'is-celebrating' : ''}`}
-            onClick={() => onOpenChange(true)}
+            onPointerDown={onFabPointerDown}
+            onClick={() => {
+              if (skipFabClickRef.current) {
+                skipFabClickRef.current = false;
+                return;
+              }
+              onOpenChange(true);
+            }}
             tabIndex={open ? -1 : 0}
             aria-hidden={open}
             aria-label={session.agentActive ? '打开 Pagent，Agent Active' : '打开 Pagent'}

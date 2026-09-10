@@ -383,7 +383,7 @@
     border-radius 240ms var(--ease-out-strong);
 }
 
-.pagent-morph-shell:not(.is-open):has(.pagent-fab:active) {
+.pagent-morph-shell:not(.is-open):has(.pagent-fab:active):not(.is-manipulating) {
   transform: scale(0.9);
 }
 
@@ -399,6 +399,7 @@
 
 .pagent-morph-shell.is-manipulating {
   transition: none;
+  user-select: none;
 }
 
 .pagent-panel-stage {
@@ -446,11 +447,18 @@
   filter: blur(0);
   visibility: visible;
   transform: scale(1);
+  cursor: grab;
+  touch-action: none;
   transition:
     opacity 150ms ease 160ms,
     filter 200ms ease 120ms,
     transform 320ms var(--ease-out-strong),
     visibility 0s;
+}
+
+.pagent-fab:active,
+.pagent-morph-shell.is-manipulating:not(.is-open) .pagent-fab {
+  cursor: grabbing;
 }
 
 .pagent-morph-shell.is-open .pagent-fab {

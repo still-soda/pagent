@@ -2,6 +2,9 @@ export const PAGENT_Z_INDEX = 2147483647;
 export const DEFAULT_PANEL_WIDTH = 400;
 export const MIN_PANEL_WIDTH = 320;
 export const MAX_PANEL_WIDTH = 720;
+export const FAB_SIZE = 56;
+export const FAB_INSET = 8;
+export const FAB_DRAG_THRESHOLD = 5;
 
 export type PanelPosition = { x: number; y: number };
 export type PanelResizeEdge = 'left' | 'right';
@@ -63,6 +66,44 @@ export function defaultPanelPosition(
   );
 }
 
+export function clampFabPosition(
+  position: PanelPosition,
+  viewport = { width: window.innerWidth, height: window.innerHeight },
+): PanelPosition {
+  const maxX = Math.max(FAB_INSET, viewport.width - FAB_SIZE - FAB_INSET);
+  const maxY = Math.max(FAB_INSET, viewport.height - FAB_SIZE - FAB_INSET);
+  return {
+    x: Math.min(maxX, Math.max(FAB_INSET, position.x)),
+    y: Math.min(maxY, Math.max(FAB_INSET, position.y)),
+  };
+}
+
+/** Bottom-right corner of the panel, where the collapsed orb sits. */
+export function collapsedPosition(
+  position: PanelPosition,
+  size = panelSize(),
+  viewport = { width: window.innerWidth, height: window.innerHeight },
+): PanelPosition {
+  return clampFabPosition(
+    {
+      x: position.x + size.width - FAB_SIZE,
+      y: position.y + size.height - FAB_SIZE,
+    },
+    viewport,
+  );
+}
+
+/** Panel top-left that keeps the orb at the panel's bottom-right corner. */
+export function panelPositionFromFab(
+  fab: PanelPosition,
+  size = panelSize(),
+): PanelPosition {
+  return {
+    x: fab.x + FAB_SIZE - size.width,
+    y: fab.y + FAB_SIZE - size.height,
+  };
+}
+
 export function loadPanelWidth(): number {
   const stored = readStoredLayout();
   if (typeof stored?.width === 'number') return clampPanelWidth(stored.width);
@@ -72,7 +113,7 @@ export function loadPanelWidth(): number {
 export function loadPanelPosition(): PanelPosition {
   const stored = readStoredLayout();
   if (typeof stored?.x === 'number' && typeof stored?.y === 'number') {
-    return clampPanelPosition({ x: stored.x, y: stored.y }, panelSize(loadPanelWidth()));
+    return { x: stored.x, y: stored.y };
   }
   return defaultPanelPosition(panelSize(loadPanelWidth()));
 }
@@ -83,7 +124,8 @@ export function savePanelLayout(position: PanelPosition, width: number) {
     sessionStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
-        ...clampPanelPosition(position, panelSize(nextWidth)),
+        x: Math.round(position.x),
+        y: Math.round(position.y),
         width: nextWidth,
       }),
     );
