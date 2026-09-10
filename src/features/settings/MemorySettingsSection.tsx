@@ -8,7 +8,7 @@ import { Switch } from '@/shared/ui/beui/switch';
 import { Label } from '@/shared/ui/label';
 import { rpc } from '@/shared/extension/rpc-client';
 import type { MemoryView } from '@/shared/contracts/memory';
-import type { AgentSettings, MemorySettings } from '@/shared/contracts/settings';
+import type { AgentSettings, AgentSettingsPatch, MemorySettings } from '@/shared/contracts/settings';
 
 type MemoryGroups = {
   domain: string | null;
@@ -137,7 +137,7 @@ export function MemorySettingsSection({
   onPatch,
 }: {
   settings: AgentSettings;
-  onPatch: (patch: Partial<AgentSettings>) => Promise<void>;
+  onPatch: (patch: AgentSettingsPatch) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const [key, setKey] = useState('');

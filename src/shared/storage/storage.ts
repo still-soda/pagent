@@ -17,9 +17,12 @@ import {
   SESSION_STORES,
 } from './idb';
 import {
+  applySettingsPatch,
   DEFAULT_SETTINGS,
   PROVIDER_IDS,
+  snapshotProviderProfile,
   type AgentSettings,
+  type AgentSettingsPatch,
   type SecretMap,
 } from '@/shared/contracts/settings';
 import { EMPTY_MCP_CONFIG, mcpConfigSchema, type McpConfig } from '@/shared/contracts/mcp';
@@ -267,11 +270,12 @@ export async function loadConversationsForPage(
 
 export async function loadSettings(): Promise<AgentSettings> {
   const stored = await settingsItem.getValue();
-  const settings = {
+  const settings: AgentSettings = {
     ...DEFAULT_SETTINGS,
     ...stored,
     model: { ...DEFAULT_SETTINGS.model, ...stored.model },
     memory: { ...DEFAULT_SETTINGS.memory, ...stored.memory },
+    providerProfiles: { ...DEFAULT_SETTINGS.providerProfiles, ...stored.providerProfiles },
   };
   // @langchain/openai 1.5 only recognizes OpenAI reasoning-summary events,
   // while DeepSeek Responses streams response.reasoning_text.delta.
@@ -279,17 +283,17 @@ export async function loadSettings(): Promise<AgentSettings> {
   if (settings.model.provider === 'deepseek' && settings.model.apiProtocol === 'responses') {
     settings.model.apiProtocol = 'chat-completions';
   }
+  if (!settings.providerProfiles[settings.model.provider]) {
+    settings.providerProfiles = {
+      ...settings.providerProfiles,
+      [settings.model.provider]: snapshotProviderProfile(settings.model),
+    };
+  }
   return settings;
 }
 
-export async function saveSettings(patch: Partial<AgentSettings>): Promise<AgentSettings> {
-  const current = await loadSettings();
-  const next = {
-    ...current,
-    ...patch,
-    model: { ...current.model, ...patch.model },
-    memory: { ...current.memory, ...patch.memory },
-  };
+export async function saveSettings(patch: AgentSettingsPatch): Promise<AgentSettings> {
+  const next = applySettingsPatch(await loadSettings(), patch);
   await settingsItem.setValue(next);
   return next;
 }

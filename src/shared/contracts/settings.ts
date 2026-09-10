@@ -38,6 +38,13 @@ export type ModelSettings = {
   persistKey: boolean;
 };
 
+/** 每个服务商上次使用的模型、Base URL 和协议，切换回来时恢复。 */
+export type ProviderProfile = {
+  model: string;
+  baseURL?: string;
+  apiProtocol: ApiProtocol;
+};
+
 export type ProviderPreset = {
   label: string;
   model: string;
@@ -274,6 +281,8 @@ export function resolveModelList(base: CatalogModel[], remote?: CatalogModel[]):
 
 export type AgentSettings = {
   model: ModelSettings;
+  /** 按服务商记住上次的模型 / URL / 协议，切换回来时恢复而不是回到预设。 */
+  providerProfiles: Partial<Record<ProviderId, ProviderProfile>>;
   memory: MemorySettings;
   executionMode: ExecutionMode;
   allowCrossOrigin: boolean;
@@ -284,6 +293,82 @@ export type AgentSettings = {
   disabledBuiltinTools: string[];
   theme: 'light' | 'dark' | 'system';
 };
+
+export type AgentSettingsPatch = Partial<Omit<AgentSettings, 'model' | 'memory' | 'providerProfiles'>> & {
+  model?: Partial<ModelSettings>;
+  memory?: Partial<MemorySettings>;
+  providerProfiles?: AgentSettings['providerProfiles'];
+};
+
+export function snapshotProviderProfile(model: ModelSettings): ProviderProfile {
+  const profile: ProviderProfile = {
+    model: model.model,
+    apiProtocol: model.apiProtocol,
+  };
+  if (model.baseURL !== undefined) profile.baseURL = model.baseURL;
+  return profile;
+}
+
+export function modelSettingsForProvider(
+  provider: ProviderId,
+  profiles: Partial<Record<ProviderId, ProviderProfile>> | undefined,
+  persistKey: boolean,
+): ModelSettings {
+  const preset = PROVIDER_PRESETS[provider];
+  const saved = profiles?.[provider];
+  const next: ModelSettings = {
+    provider,
+    persistKey,
+    model: saved?.model ?? preset.model,
+    apiProtocol: saved?.apiProtocol ?? preset.apiProtocol,
+  };
+  if (saved?.baseURL !== undefined) next.baseURL = saved.baseURL;
+  return next;
+}
+
+function mergeModelSettings(base: ModelSettings, patch?: Partial<ModelSettings>): ModelSettings {
+  if (!patch) return { ...base };
+  const next = { ...base, ...patch };
+  if ('baseURL' in patch && patch.baseURL === undefined) {
+    delete next.baseURL;
+  }
+  return next;
+}
+
+/** 合并设置补丁：切换服务商时先归档当前项，再恢复目标服务商上次的模型 / URL / 协议。 */
+export function applySettingsPatch(current: AgentSettings, patch: AgentSettingsPatch): AgentSettings {
+  const profiles: Partial<Record<ProviderId, ProviderProfile>> =
+    patch.providerProfiles !== undefined
+      ? { ...patch.providerProfiles }
+      : {
+          ...current.providerProfiles,
+          [current.model.provider]: snapshotProviderProfile(current.model),
+        };
+
+  const persistKey = patch.model?.persistKey ?? current.model.persistKey;
+  let model: ModelSettings;
+  if (patch.model?.provider && patch.model.provider !== current.model.provider) {
+    model = mergeModelSettings(
+      modelSettingsForProvider(patch.model.provider, profiles, persistKey),
+      patch.model,
+    );
+  } else {
+    model = mergeModelSettings(current.model, patch.model);
+  }
+
+  if (model.provider === 'deepseek' && model.apiProtocol === 'responses') {
+    model = { ...model, apiProtocol: 'chat-completions' };
+  }
+  profiles[model.provider] = snapshotProviderProfile(model);
+
+  return {
+    ...current,
+    ...patch,
+    model,
+    memory: { ...current.memory, ...patch.memory },
+    providerProfiles: profiles,
+  };
+}
 
 export type SecretMap = Partial<Record<ProviderId, string>>;
 
@@ -301,6 +386,7 @@ export const DEFAULT_SETTINGS: AgentSettings = {
     apiProtocol: 'chat-completions',
     persistKey: true,
   },
+  providerProfiles: {},
   memory: {
     enabled: true,
     provider: 'jina',

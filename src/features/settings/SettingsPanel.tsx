@@ -22,6 +22,7 @@ import {
   resolveCatalogModel,
   providerSupportsResponsesApi,
   type AgentSettings,
+  type AgentSettingsPatch,
   type ApiProtocol,
   type CatalogModel,
   type PermissionState,
@@ -201,7 +202,7 @@ export function SettingsPanel({
     if (scrollContainer) scrollContainer.scrollTop = 0;
   }, []);
 
-  const patch = async (next: Partial<AgentSettings>) => {
+  const patch = async (next: AgentSettingsPatch) => {
     const saved = (await rpc('settings.set', next)) as AgentSettings;
     onChange(saved);
   };
@@ -254,19 +255,7 @@ export function SettingsPanel({
           <Select
             value={provider}
             onValueChange={(provider) => {
-              const next = provider as ProviderId;
-              const nextPreset = PROVIDER_PRESETS[next];
-              void patch({
-                model: {
-                  ...settings.model,
-                  provider: next,
-                  model: nextPreset.model,
-                  apiProtocol: nextPreset.apiProtocol,
-                  baseURL: providerUsesOpenAICompat(next)
-                    ? (nextPreset.baseURL ?? settings.model.baseURL)
-                    : undefined,
-                },
-              });
+              void patch({ model: { provider: provider as ProviderId } });
             }}
           >
             <SelectTrigger id="provider" aria-label="服务商" className="w-full">
@@ -699,7 +688,17 @@ export function SettingsPanel({
       <p className="text-[11px] leading-5 text-ink-3">
         {status && <span className="mt-1 block text-ink-2">{status}</span>}
       </p>
-      <Button size="sm" variant="ghost" onClick={() => void patch(DEFAULT_SETTINGS)}>
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={() =>
+          void patch({
+            ...DEFAULT_SETTINGS,
+            model: { ...DEFAULT_SETTINGS.model, baseURL: undefined },
+            providerProfiles: {},
+          })
+        }
+      >
         恢复默认
       </Button>
     </div>

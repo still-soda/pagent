@@ -53,7 +53,7 @@ import {
   toConversationSummary,
   toExportedConversation,
 } from '@/features/settings/conversation-archive';
-import type { AgentSettings } from '@/shared/contracts/settings';
+import type { AgentSettingsPatch } from '@/shared/contracts/settings';
 import type { PageConversationStore } from '@/shared/contracts/session';
 import type { RecordedAction } from '@/shared/contracts/teaching';
 import { loadCommands } from '@/features/teaching/storage';
@@ -207,7 +207,7 @@ export async function handleRpc(name: RpcName, payload: unknown, senderTabId?: n
     case 'settings.get':
       return settings;
     case 'settings.set':
-      return saveSettings(parseRpcPayload('settings.set', payload) as Partial<AgentSettings>);
+      return saveSettings(parseRpcPayload('settings.set', payload) as AgentSettingsPatch);
     case 'mcp.getState':
       return syncMcpServers(false);
     case 'mcp.setConfig': {
