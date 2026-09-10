@@ -15,7 +15,8 @@
     "tests/**/*",
     "vitest.config.ts",
     "playwright.config.ts",
-    "wxt.config.ts"
+    "wxt.config.ts",
+    "mcp/**/*.ts"
   ],
   "exclude": ["tests/web-playground"]
 }

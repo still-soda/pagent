@@ -65,3 +65,33 @@ pnpm test:e2e
 - 网络请求与控制台日志（CDP `Network` / `Runtime` / `Log`，任务开始时 attach 并缓冲）
 - 内置命名脚本：链接、标题、表单、meta、页面统计、选区
 - 可选 `execute_cdp_script`，仅在设置中明确开启
+
+## MCP 服务
+
+Pagent 可作为一个 MCP 服务，供外部 Agent 查看浏览器标签页、派发任务并查询会话状态。先加载扩展，再启动服务：
+
+```bash
+pnpm mcp
+```
+
+在 MCP 客户端中配置：
+
+```json
+{
+  "mcpServers": {
+    "pagent": {
+      "command": "pnpm",
+      "args": ["--dir", "/绝对路径/pagent", "mcp"]
+    }
+  }
+}
+```
+
+工具：
+
+- `get_usage`：查询本服务用法，供本地 Agent 与 Pagent 协同（扩展未连接时也可用）
+- `list_tabs`：罗列全部标签页，以及是否有 Agent 正在该页工作
+- `dispatch_task`：向指定标签页（或新建/导航到 url）派发任务
+- `get_session`：按 sessionId / tabId / conversationId 查看会话状态
+
+MCP 进程在 `127.0.0.1:17342-17357` 内寻找空闲端口并监听；扩展启动后在同一范围内探测 `/health` 发现服务。`--port` / `PAGENT_MCP_PORT` 必须落在该范围内，并作为优先尝试的端口。HTTP MCP 地址为 `http://127.0.0.1:<实际端口>/mcp`。在终端里直接运行时不会占用 stdin；由 MCP 客户端以管道拉起时自动启用 stdio。
