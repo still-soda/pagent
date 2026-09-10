@@ -138,7 +138,7 @@ export async function startAgent(
   imageDataUrl?: string,
   badges?: UserBadge[],
   references?: UserReference[],
-) {
+): Promise<{ ok: true; tabId: number; sessionId: string; conversationId: string }> {
   const previous = findRunningByTab(tabId) ?? running.get(tabId);
   running.delete(tabId);
   if (previous) stopControl(previous, false);
@@ -236,7 +236,7 @@ export async function startAgent(
     endBusyKeepAlive();
   });
   void done.catch(() => undefined);
-  return { ok: true, tabId };
+  return { ok: true, tabId, sessionId, conversationId: targetId };
 }
 
 export function stopAgent(tabId: number) {
